@@ -1807,7 +1807,7 @@ func TestFindClosingPullRequestsGraphQLParameters(t *testing.T) {
 				owner:            "microsoft",
 				repo:             "vscode",
 				issueNumbers:     []int{1},
-				includeClosedPrs: boolPtr(true),
+				includeClosedPrs: github.ToBoolPtr(true),
 				description:      "Test includeClosedPrs parameter with popular repository",
 			},
 			{
@@ -1815,7 +1815,7 @@ func TestFindClosingPullRequestsGraphQLParameters(t *testing.T) {
 				owner:            "microsoft",
 				repo:             "vscode",
 				issueNumbers:     []int{2},
-				includeClosedPrs: boolPtr(false),
+				includeClosedPrs: github.ToBoolPtr(false),
 				description:      "Test includeClosedPrs=false parameter",
 			},
 			{
@@ -1823,7 +1823,7 @@ func TestFindClosingPullRequestsGraphQLParameters(t *testing.T) {
 				owner:        "microsoft",
 				repo:         "vscode",
 				issueNumbers: []int{1, 2}, // Use low numbers for older issues
-				orderByState: boolPtr(true),
+				orderByState: github.ToBoolPtr(true),
 				description:  "Test orderByState parameter with larger repository",
 			},
 			{
@@ -1831,7 +1831,7 @@ func TestFindClosingPullRequestsGraphQLParameters(t *testing.T) {
 				owner:          "facebook",
 				repo:           "react",
 				issueNumbers:   []int{1}, // First issue in React repo
-				userLinkedOnly: boolPtr(true),
+				userLinkedOnly: github.ToBoolPtr(true),
 				description:    "Test userLinkedOnly parameter",
 			},
 			{
@@ -1839,9 +1839,9 @@ func TestFindClosingPullRequestsGraphQLParameters(t *testing.T) {
 				owner:            "facebook",
 				repo:             "react",
 				issueNumbers:     []int{1, 2},
-				includeClosedPrs: boolPtr(true),
-				orderByState:     boolPtr(true),
-				userLinkedOnly:   boolPtr(false),
+				includeClosedPrs: github.ToBoolPtr(true),
+				orderByState:     github.ToBoolPtr(true),
+				userLinkedOnly:   github.ToBoolPtr(false),
 				description:      "Test multiple boolean parameters together",
 			},
 		}
@@ -1975,7 +1975,7 @@ func TestFindClosingPullRequestsGraphQLParameters(t *testing.T) {
 				owner:        "microsoft",
 				repo:         "vscode",
 				issueNumbers: []int{1, 2},
-				first:        intPtr(1),
+				first:        github.ToIntPtr(1),
 				description:  "Test forward pagination using first parameter",
 			},
 			{
@@ -1983,7 +1983,7 @@ func TestFindClosingPullRequestsGraphQLParameters(t *testing.T) {
 				owner:        "microsoft",
 				repo:         "vscode",
 				issueNumbers: []int{1, 2},
-				last:         intPtr(1),
+				last:         github.ToIntPtr(1),
 				description:  "Test backward pagination using last parameter",
 			},
 			{
@@ -1991,7 +1991,7 @@ func TestFindClosingPullRequestsGraphQLParameters(t *testing.T) {
 				owner:        "microsoft",
 				repo:         "vscode",
 				issueNumbers: []int{1, 2, 3},
-				first:        intPtr(1), // Small page size
+				first:        github.ToIntPtr(1), // Small page size
 				description:  "Test pagination with larger repository",
 			},
 		}
@@ -2234,17 +2234,4 @@ func TestFindClosingPullRequestsGraphQLParameters(t *testing.T) {
 			})
 		}
 	})
-}
-
-// Helper functions for pointer creation
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-func intPtr(i int) *int {
-	return &i
-}
-
-func stringPtr(s string) *string {
-	return &s
 }

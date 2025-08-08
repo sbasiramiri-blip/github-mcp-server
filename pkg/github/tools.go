@@ -213,6 +213,11 @@ func ToBoolPtr(b bool) *bool {
 	return &b
 }
 
+// ToIntPtr converts an int to a *int pointer.
+func ToIntPtr(i int) *int {
+	return &i
+}
+
 // ToStringPtr converts a string to a *string pointer.
 // Returns nil if the string is empty.
 func ToStringPtr(s string) *string {
