@@ -427,7 +427,6 @@ func ListSubIssues(getClient GetClientFn, t translations.TranslationHelperFunc) 
 				mcp.Description("Issue number"),
 			),
 			mcp.WithNumber("page",
-				mcp.Description("Page number for pagination (default: 1)"),
 			),
 			mcp.WithNumber("per_page",
 				mcp.Description("Number of results per page (max 100, default: 30)"),
