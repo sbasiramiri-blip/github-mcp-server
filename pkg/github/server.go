@@ -13,8 +13,15 @@ import (
 // NewServer creates a new GitHub MCP server with the specified GH client and logger.
 
 func NewServer(version string, opts ...server.ServerOption) *server.MCPServer {
+	const instructions = `GitHub MCP Server - Provides tools for GitHub operations for things like pull requests, issues, repositories, and more.
+		When using this MCP Server, keep in mind these common arguments used across many tools:
+		• "owner" - Repository owner (username or organization)
+		• "repo" - Repository name
+		• "page" - Page number for pagination (min: 1)
+		• "perPage" - Results per page (min: 1, max: 100)`
 	// Add default options
 	defaultOpts := []server.ServerOption{
+		server.WithInstructions(instructions),
 		server.WithToolCapabilities(true),
 		server.WithResourceCapabilities(true, true),
 		server.WithLogging(),
