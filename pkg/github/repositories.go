@@ -35,6 +35,10 @@ func GetCommit(getClient GetClientFn, t translations.TranslationHelperFunc) (too
 				mcp.Required(),
 				mcp.Description("Commit SHA, branch name, or tag name"),
 			),
+			mcp.WithBoolean("include_diff",
+				mcp.Description("Whether to include file diffs and stats in the response. Default is true."),
+				mcp.DefaultBool(true),
+			),
 			WithPagination(),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -47,6 +51,10 @@ func GetCommit(getClient GetClientFn, t translations.TranslationHelperFunc) (too
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			sha, err := RequiredParam[string](request, "sha")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			includeDiff, err := OptionalBoolParamWithDefault(request, "include_diff", true)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -82,7 +90,10 @@ func GetCommit(getClient GetClientFn, t translations.TranslationHelperFunc) (too
 				return mcp.NewToolResultError(fmt.Sprintf("failed to get commit: %s", string(body))), nil
 			}
 
-			r, err := json.Marshal(commit)
+			// Convert to minimal commit
+			minimalCommit := convertToMinimalCommit(commit, includeDiff)
+
+			r, err := json.Marshal(minimalCommit)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal response: %w", err)
 			}
@@ -170,7 +181,13 @@ func ListCommits(getClient GetClientFn, t translations.TranslationHelperFunc) (t
 				return mcp.NewToolResultError(fmt.Sprintf("failed to list commits: %s", string(body))), nil
 			}
 
-			r, err := json.Marshal(commits)
+			// Convert to minimal commits
+			minimalCommits := make([]MinimalCommit, len(commits))
+			for i, commit := range commits {
+				minimalCommits[i] = convertToMinimalCommit(commit, false)
+			}
+
+			r, err := json.Marshal(minimalCommits)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal response: %w", err)
 			}
@@ -239,7 +256,13 @@ func ListBranches(getClient GetClientFn, t translations.TranslationHelperFunc) (
 				return mcp.NewToolResultError(fmt.Sprintf("failed to list branches: %s", string(body))), nil
 			}
 
-			r, err := json.Marshal(branches)
+			// Convert to minimal branches
+			minimalBranches := make([]MinimalBranch, 0, len(branches))
+			for _, branch := range branches {
+				minimalBranches = append(minimalBranches, convertToMinimalBranch(branch))
+			}
+
+			r, err := json.Marshal(minimalBranches)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal response: %w", err)
 			}
@@ -362,7 +385,7 @@ func CreateOrUpdateFile(getClient GetClientFn, t translations.TranslationHelperF
 // CreateRepository creates a tool to create a new GitHub repository.
 func CreateRepository(getClient GetClientFn, t translations.TranslationHelperFunc) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("create_repository",
-			mcp.WithDescription(t("TOOL_CREATE_REPOSITORY_DESCRIPTION", "Create a new GitHub repository in your account")),
+			mcp.WithDescription(t("TOOL_CREATE_REPOSITORY_DESCRIPTION", "Create a new GitHub repository in your account or specified organization")),
 			mcp.WithToolAnnotation(mcp.ToolAnnotation{
 				Title:        t("TOOL_CREATE_REPOSITORY_USER_TITLE", "Create repository"),
 				ReadOnlyHint: ToBoolPtr(false),
@@ -373,6 +396,9 @@ func CreateRepository(getClient GetClientFn, t translations.TranslationHelperFun
 			),
 			mcp.WithString("description",
 				mcp.Description("Repository description"),
+			),
+			mcp.WithString("organization",
+				mcp.Description("Organization to create the repository in (omit to create in your personal account)"),
 			),
 			mcp.WithBoolean("private",
 				mcp.Description("Whether repo should be private"),
@@ -387,6 +413,10 @@ func CreateRepository(getClient GetClientFn, t translations.TranslationHelperFun
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			description, err := OptionalParam[string](request, "description")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			organization, err := OptionalParam[string](request, "organization")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -410,7 +440,7 @@ func CreateRepository(getClient GetClientFn, t translations.TranslationHelperFun
 			if err != nil {
 				return nil, fmt.Errorf("failed to get GitHub client: %w", err)
 			}
-			createdRepo, resp, err := client.Repositories.Create(ctx, "", repo)
+			createdRepo, resp, err := client.Repositories.Create(ctx, organization, repo)
 			if err != nil {
 				return ghErrors.NewGitHubAPIErrorResponse(ctx,
 					"failed to create repository",
@@ -428,7 +458,12 @@ func CreateRepository(getClient GetClientFn, t translations.TranslationHelperFun
 				return mcp.NewToolResultError(fmt.Sprintf("failed to create repository: %s", string(body))), nil
 			}
 
-			r, err := json.Marshal(createdRepo)
+			// Return minimal response with just essential information
+			minimalResponse := MinimalResponse{
+				URL: createdRepo.GetHTMLURL(),
+			}
+
+			r, err := json.Marshal(minimalResponse)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal response: %w", err)
 			}
@@ -694,7 +729,12 @@ func ForkRepository(getClient GetClientFn, t translations.TranslationHelperFunc)
 				return mcp.NewToolResultError(fmt.Sprintf("failed to fork repository: %s", string(body))), nil
 			}
 
-			r, err := json.Marshal(forkedRepo)
+			// Return minimal response with just essential information
+			minimalResponse := MinimalResponse{
+				URL: forkedRepo.GetHTMLURL(),
+			}
+
+			r, err := json.Marshal(minimalResponse)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal response: %w", err)
 			}
