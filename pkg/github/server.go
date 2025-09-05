@@ -19,7 +19,10 @@ func NewServer(version string, opts ...server.ServerOption) *server.MCPServer {
 		• "repo" - Repository name
 		• "page" - Page number for pagination (min: 1)
 		• "perPage" - Results per page (min: 1, max: 100)
-		If you need information about the user to use a tool and you are not sure what to provide, you can use the "get_current_user" tool to get details about the authenticated user.		`
+
+		Also keep in mind the following:
+		- If you need information about the user to use a tool and you are not sure what to provide, you can use the "get_current_user" tool to get details about the authenticated user.
+		`
 	// Add default options
 	defaultOpts := []server.ServerOption{
 		server.WithInstructions(instructions),
