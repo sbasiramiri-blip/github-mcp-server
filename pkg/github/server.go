@@ -18,7 +18,8 @@ func NewServer(version string, opts ...server.ServerOption) *server.MCPServer {
 		• "owner" - Repository owner (username or organization)
 		• "repo" - Repository name
 		• "page" - Page number for pagination (min: 1)
-		• "perPage" - Results per page (min: 1, max: 100)`
+		• "perPage" - Results per page (min: 1, max: 100)
+		If you need information about the user to use a tool and you are not sure what to provide, you can use the "get_current_user" tool to get details about the authenticated user.		`
 	// Add default options
 	defaultOpts := []server.ServerOption{
 		server.WithInstructions(instructions),
@@ -201,12 +202,10 @@ func OptionalStringArrayParam(r mcp.CallToolRequest, p string) ([]string, error)
 func WithPagination() mcp.ToolOption {
 	return func(tool *mcp.Tool) {
 		mcp.WithNumber("page",
-			mcp.Description("Page number for pagination (min 1)"),
 			mcp.Min(1),
 		)(tool)
 
 		mcp.WithNumber("perPage",
-			mcp.Description("Results per page for pagination (min 1, max 100)"),
 			mcp.Min(1),
 			mcp.Max(100),
 		)(tool)
@@ -218,12 +217,10 @@ func WithPagination() mcp.ToolOption {
 func WithUnifiedPagination() mcp.ToolOption {
 	return func(tool *mcp.Tool) {
 		mcp.WithNumber("page",
-			mcp.Description("Page number for pagination (min 1)"),
 			mcp.Min(1),
 		)(tool)
 
 		mcp.WithNumber("perPage",
-			mcp.Description("Results per page for pagination (min 1, max 100)"),
 			mcp.Min(1),
 			mcp.Max(100),
 		)(tool)
@@ -238,7 +235,6 @@ func WithUnifiedPagination() mcp.ToolOption {
 func WithCursorPagination() mcp.ToolOption {
 	return func(tool *mcp.Tool) {
 		mcp.WithNumber("perPage",
-			mcp.Description("Results per page for pagination (min 1, max 100)"),
 			mcp.Min(1),
 			mcp.Max(100),
 		)(tool)
