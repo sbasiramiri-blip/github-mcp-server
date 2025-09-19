@@ -61,6 +61,7 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(GetIssueComments(getClient, t)),
 			toolsets.NewServerTool(ListIssueTypes(getClient, t)),
 			toolsets.NewServerTool(ListSubIssues(getClient, t)),
+			toolsets.NewServerTool(GetLabel(getGQLClient, t)),
 		).
 		AddWriteTools(
 			toolsets.NewServerTool(CreateIssue(getClient, t)),
@@ -71,6 +72,8 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(RemoveSubIssue(getClient, t)),
 			toolsets.NewServerTool(ReprioritizeSubIssue(getClient, t)),
 			toolsets.NewServerTool(CreateLabel(getGQLClient, t)),
+			toolsets.NewServerTool(UpdateLabel(getGQLClient, t)),
+			toolsets.NewServerTool(DeleteLabel(getGQLClient, t)),
 		).AddPrompts(
 		toolsets.NewServerPrompt(AssignCodingAgentPrompt(t)),
 		toolsets.NewServerPrompt(IssueToFixWorkflowPrompt(t)),

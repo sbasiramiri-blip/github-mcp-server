@@ -1789,10 +1789,8 @@ func CreateLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFu
 			var mutation struct {
 				CreateLabel struct {
 					Label struct {
-						ID          githubv4.ID
-						Name        githubv4.String
-						Color       githubv4.String
-						Description githubv4.String
+						Name githubv4.String
+						ID   githubv4.ID
 					}
 				} `graphql:"createLabel(input: $input)"`
 			}
@@ -1801,29 +1799,298 @@ func CreateLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFu
 				return ghErrors.NewGitHubGraphQLErrorResponse(ctx, "Failed to create label", err), nil
 			}
 
-			out := map[string]any{
-				"id":          fmt.Sprintf("%v", mutation.CreateLabel.Label.ID),
-				"name":        string(mutation.CreateLabel.Label.Name),
-				"color":       string(mutation.CreateLabel.Label.Color),
-				"description": string(mutation.CreateLabel.Label.Description),
-			}
-
-			r, err := json.Marshal(out)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal response: %w", err)
-			}
-
-			return mcp.NewToolResultText(string(r)), nil
+			return mcp.NewToolResultText(fmt.Sprintf("label %s created successfully", mutation.CreateLabel.Label.Name)), nil
 		}
 }
 
-// Get 		label
-//func GetLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {}
-// Update label
-//func UpdateLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {}
-// Delete label
-//func DeleteLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {}
+// Get label
+func GetLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
+	return mcp.NewTool("get_label",
+			mcp.WithDescription(t("TOOL_GET_LABEL_DESCRIPTION", "Get a label in a GitHub repository.")),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:        t("TOOL_GET_LABEL_TITLE", "Get label"),
+				ReadOnlyHint: ToBoolPtr(true),
+			}),
+			mcp.WithString("owner",
+				mcp.Required(),
+				mcp.Description("Repository owner"),
+			),
+			mcp.WithString("repo",
+				mcp.Required(),
+				mcp.Description("Repository name"),
+			),
+			mcp.WithString("name",
+				mcp.Required(),
+				mcp.Description("Name of the label to retrieve"),
+			),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			owner, err := RequiredParam[string](request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := RequiredParam[string](request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			name, err := RequiredParam[string](request, "name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
 
+			client, err := getGQLClient(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get GitHub client: %w", err)
+			}
+
+			var query struct {
+				Repository struct {
+					Label struct {
+						ID          githubv4.ID
+						Name        githubv4.String
+						Color       githubv4.String
+						Description githubv4.String
+					} `graphql:"label(name: $name)"`
+				} `graphql:"repository(owner: $owner, name: $repo)"`
+			}
+
+			vars := map[string]any{
+				"owner": githubv4.String(owner),
+				"repo":  githubv4.String(repo),
+				"name":  githubv4.String(name),
+			}
+
+			if err := client.Query(ctx, &query, vars); err != nil {
+				return ghErrors.NewGitHubGraphQLErrorResponse(ctx, "Failed to find label", err), nil
+			}
+
+			// If label wasn't found, return a helpful error
+			if query.Repository.Label.Name == "" {
+				return mcp.NewToolResultError(fmt.Sprintf("label '%s' not found in %s/%s", name, owner, repo)), nil
+			}
+
+			label := map[string]interface{}{
+				"id":          fmt.Sprintf("%v", query.Repository.Label.ID),
+				"name":        string(query.Repository.Label.Name),
+				"color":       string(query.Repository.Label.Color),
+				"description": string(query.Repository.Label.Description),
+			}
+
+			out, err := json.Marshal(label)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal label: %w", err)
+			}
+
+			return mcp.NewToolResultText(string(out)), nil
+		}
+}
+
+// Update label
+func UpdateLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
+	return mcp.NewTool("update_label",
+			mcp.WithDescription(t("TOOL_UPDATE_LABEL_DESCRIPTION", "Update an existing label in a GitHub repository.")),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:        t("TOOL_UPDATE_LABEL_TITLE", "Update label"),
+				ReadOnlyHint: ToBoolPtr(false),
+			}),
+			mcp.WithString("owner",
+				mcp.Required(),
+				mcp.Description("Repository owner"),
+			),
+			mcp.WithString("repo",
+				mcp.Required(),
+				mcp.Description("Repository name"),
+			),
+			mcp.WithString("name",
+				mcp.Required(),
+				mcp.Description("Name of the existing label to update"),
+			),
+			mcp.WithString("new_name",
+				mcp.Description("New name for the label"),
+			),
+			mcp.WithString("color",
+				mcp.Description("New label color as a 6-character hex code without '#', e.g. 'f29513'"),
+			),
+			mcp.WithString("description",
+				mcp.Description("New label description"),
+			),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			owner, err := RequiredParam[string](request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := RequiredParam[string](request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			name, err := RequiredParam[string](request, "name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			newName, err := OptionalParam[string](request, "new_name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			color, err := OptionalParam[string](request, "color")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			description, err := OptionalParam[string](request, "description")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			client, err := getGQLClient(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get GitHub client: %w", err)
+			}
+
+			// Fetch the label to get its GQL ID
+			var query struct {
+				Repository struct {
+					Label struct {
+						ID   githubv4.ID
+						Name githubv4.String
+					} `graphql:"label(name: $name)"`
+				} `graphql:"repository(owner: $owner, name: $repo)"`
+			}
+
+			vars := map[string]any{
+				"owner": githubv4.String(owner),
+				"repo":  githubv4.String(repo),
+				"name":  githubv4.String(name),
+			}
+
+			if err := client.Query(ctx, &query, vars); err != nil {
+				return ghErrors.NewGitHubGraphQLErrorResponse(ctx, "Failed to find label", err), nil
+			}
+
+			// If label wasn't found, return a helpful error
+			if query.Repository.Label.Name == "" {
+				return mcp.NewToolResultError(fmt.Sprintf("label '%s' not found in %s/%s", name, owner, repo)), nil
+			}
+
+			// Build the update input, only set fields that were provided
+			input := githubv4.UpdateLabelInput{
+				ID: query.Repository.Label.ID,
+			}
+			if newName != "" {
+				n := githubv4.String(newName)
+				input.Name = &n
+			}
+			if color != "" {
+				c := githubv4.String(color)
+				input.Color = &c
+			}
+			if description != "" {
+				d := githubv4.String(description)
+				input.Description = &d
+			}
+
+			var mutation struct {
+				UpdateLabel struct {
+					Label struct {
+						Name githubv4.String
+						ID   githubv4.ID
+					}
+				} `graphql:"updateLabel(input: $input)"`
+			}
+
+			if err := client.Mutate(ctx, &mutation, input, nil); err != nil {
+				return ghErrors.NewGitHubGraphQLErrorResponse(ctx, "Failed to update label", err), nil
+			}
+
+			return mcp.NewToolResultText(fmt.Sprintf("label %s updated successfully", mutation.UpdateLabel.Label.Name)), nil
+		}
+}
+
+// Delete label
+func DeleteLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
+	return mcp.NewTool("delete_label",
+			mcp.WithDescription(t("TOOL_DELETE_LABEL_DESCRIPTION", "Delete an existing label from a GitHub repository.")),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:        t("TOOL_DELETE_LABEL_TITLE", "Delete label"),
+				ReadOnlyHint: ToBoolPtr(false),
+			}),
+			mcp.WithString("owner",
+				mcp.Required(),
+				mcp.Description("Repository owner"),
+			),
+			mcp.WithString("repo",
+				mcp.Required(),
+				mcp.Description("Repository name"),
+			),
+			mcp.WithString("name",
+				mcp.Required(),
+				mcp.Description("Name of the label to delete"),
+			),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			owner, err := RequiredParam[string](request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := RequiredParam[string](request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			name, err := RequiredParam[string](request, "name")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			client, err := getGQLClient(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get GitHub client: %w", err)
+			}
+
+			// Fetch the label to get its GQL ID
+			var query struct {
+				Repository struct {
+					Label struct {
+						ID   githubv4.ID
+						Name githubv4.String
+					} `graphql:"label(name: $name)"`
+				} `graphql:"repository(owner: $owner, name: $repo)"`
+			}
+
+			vars := map[string]any{
+				"owner": githubv4.String(owner),
+				"repo":  githubv4.String(repo),
+				"name":  githubv4.String(name),
+			}
+
+			if err := client.Query(ctx, &query, vars); err != nil {
+				return ghErrors.NewGitHubGraphQLErrorResponse(ctx, "Failed to find label", err), nil
+			}
+
+			// If label wasn't found, return a helpful error
+			if query.Repository.Label.Name == "" {
+				return mcp.NewToolResultError(fmt.Sprintf("label '%s' not found in %s/%s", name, owner, repo)), nil
+			}
+
+			input := githubv4.DeleteLabelInput{
+				ID: query.Repository.Label.ID,
+			}
+
+			var mutation struct {
+				DeleteLabel struct {
+					Typename githubv4.String `graphql:"__typename"`
+				} `graphql:"deleteLabel(input: $input)"`
+			}
+
+			if err := client.Mutate(ctx, &mutation, input, nil); err != nil {
+				return ghErrors.NewGitHubGraphQLErrorResponse(ctx, "Failed to delete label", err), nil
+			}
+
+			return mcp.NewToolResultText(fmt.Sprintf("label %s deleted successfully", name)), nil
+		}
+}
+
+// ReplaceActorsForAssignableInput represents the input for replacing actors for an assignable entity.
+// Used in the AssignCopilotToIssue tool to assign Copilot to an issue.
 type ReplaceActorsForAssignableInput struct {
 	AssignableID githubv4.ID   `json:"assignableId"`
 	ActorIDs     []githubv4.ID `json:"actorIds"`
@@ -1851,43 +2118,4 @@ func parseISOTimestamp(timestamp string) (time.Time, error) {
 
 	// Return error with supported formats
 	return time.Time{}, fmt.Errorf("invalid ISO 8601 timestamp: %s (supported formats: YYYY-MM-DDThh:mm:ssZ or YYYY-MM-DD)", timestamp)
-}
-
-func AssignCodingAgentPrompt(t translations.TranslationHelperFunc) (tool mcp.Prompt, handler server.PromptHandlerFunc) {
-	return mcp.NewPrompt("AssignCodingAgent",
-			mcp.WithPromptDescription(t("PROMPT_ASSIGN_CODING_AGENT_DESCRIPTION", "Assign GitHub Coding Agent to multiple tasks in a GitHub repository.")),
-			mcp.WithArgument("repo", mcp.ArgumentDescription("The repository to assign tasks in (owner/repo)."), mcp.RequiredArgument()),
-		), func(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-			repo := request.Params.Arguments["repo"]
-
-			messages := []mcp.PromptMessage{
-				{
-					Role:    "user",
-					Content: mcp.NewTextContent("You are a personal assistant for GitHub the Copilot GitHub Coding Agent. Your task is to help the user assign tasks to the Coding Agent based on their open GitHub issues. You can use `assign_copilot_to_issue` tool to assign the Coding Agent to issues that are suitable for autonomous work, and `search_issues` tool to find issues that match the user's criteria. You can also use `list_issues` to get a list of issues in the repository."),
-				},
-				{
-					Role:    "user",
-					Content: mcp.NewTextContent(fmt.Sprintf("Please go and get a list of the most recent 10 issues from the %s GitHub repository", repo)),
-				},
-				{
-					Role:    "assistant",
-					Content: mcp.NewTextContent(fmt.Sprintf("Sure! I will get a list of the 10 most recent issues for the repo %s.", repo)),
-				},
-				{
-					Role:    "user",
-					Content: mcp.NewTextContent("For each issue, please check if it is a clearly defined coding task with acceptance criteria and a low to medium complexity to identify issues that are suitable for an AI Coding Agent to work on. Then assign each of the identified issues to Copilot."),
-				},
-				{
-					Role:    "assistant",
-					Content: mcp.NewTextContent("Certainly! Let me carefully check which ones are clearly scoped issues that are good to assign to the coding agent, and I will summarize and assign them now."),
-				},
-				{
-					Role:    "user",
-					Content: mcp.NewTextContent("Great, if you are unsure if an issue is good to assign, ask me first, rather than assigning copilot. If you are certain the issue is clear and suitable you can assign it to Copilot without asking."),
-				},
-			}
-			return &mcp.GetPromptResult{
-				Messages: messages,
-			}, nil
-		}
 }
