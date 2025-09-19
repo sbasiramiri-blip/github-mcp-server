@@ -1770,10 +1770,10 @@ func AssignCodingAgentPrompt(t translations.TranslationHelperFunc) (tool mcp.Pro
 
 // Label Management
 
-// Create label
+// CreateLabel creates a new MCP tool for creating labels in GitHub repositories.
 func CreateLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("create_label",
-			mcp.WithDescription(t("TOOL_CREATE_LABEL_DESCRIPTION", "Create a new label in a GitHub repository.")),
+			mcp.WithDescription(t("TOOL_CREATE_LABEL_DESCRIPTION", "Create a new label in a GitHub repository. Used in the context of labels in relation to github resources, they are organizational tags used to categorize and filter issues and pull requests.")),
 			mcp.WithToolAnnotation(mcp.ToolAnnotation{
 				Title:        t("TOOL_CREATE_LABEL_TITLE", "Create label"),
 				ReadOnlyHint: ToBoolPtr(false),
