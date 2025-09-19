@@ -1700,6 +1700,74 @@ func AssignCopilotToIssue(getGQLClient GetGQLClientFn, t translations.Translatio
 		}
 }
 
+type ReplaceActorsForAssignableInput struct {
+	AssignableID githubv4.ID   `json:"assignableId"`
+	ActorIDs     []githubv4.ID `json:"actorIds"`
+}
+
+// parseISOTimestamp parses an ISO 8601 timestamp string into a time.Time object.
+// Returns the parsed time or an error if parsing fails.
+// Example formats supported: "2023-01-15T14:30:00Z", "2023-01-15"
+func parseISOTimestamp(timestamp string) (time.Time, error) {
+	if timestamp == "" {
+		return time.Time{}, fmt.Errorf("empty timestamp")
+	}
+
+	// Try RFC3339 format (standard ISO 8601 with time)
+	t, err := time.Parse(time.RFC3339, timestamp)
+	if err == nil {
+		return t, nil
+	}
+
+	// Try simple date format (YYYY-MM-DD)
+	t, err = time.Parse("2006-01-02", timestamp)
+	if err == nil {
+		return t, nil
+	}
+
+	// Return error with supported formats
+	return time.Time{}, fmt.Errorf("invalid ISO 8601 timestamp: %s (supported formats: YYYY-MM-DDThh:mm:ssZ or YYYY-MM-DD)", timestamp)
+}
+
+func AssignCodingAgentPrompt(t translations.TranslationHelperFunc) (tool mcp.Prompt, handler server.PromptHandlerFunc) {
+	return mcp.NewPrompt("AssignCodingAgent",
+			mcp.WithPromptDescription(t("PROMPT_ASSIGN_CODING_AGENT_DESCRIPTION", "Assign GitHub Coding Agent to multiple tasks in a GitHub repository.")),
+			mcp.WithArgument("repo", mcp.ArgumentDescription("The repository to assign tasks in (owner/repo)."), mcp.RequiredArgument()),
+		), func(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+			repo := request.Params.Arguments["repo"]
+
+			messages := []mcp.PromptMessage{
+				{
+					Role:    "user",
+					Content: mcp.NewTextContent("You are a personal assistant for GitHub the Copilot GitHub Coding Agent. Your task is to help the user assign tasks to the Coding Agent based on their open GitHub issues. You can use `assign_copilot_to_issue` tool to assign the Coding Agent to issues that are suitable for autonomous work, and `search_issues` tool to find issues that match the user's criteria. You can also use `list_issues` to get a list of issues in the repository."),
+				},
+				{
+					Role:    "user",
+					Content: mcp.NewTextContent(fmt.Sprintf("Please go and get a list of the most recent 10 issues from the %s GitHub repository", repo)),
+				},
+				{
+					Role:    "assistant",
+					Content: mcp.NewTextContent(fmt.Sprintf("Sure! I will get a list of the 10 most recent issues for the repo %s.", repo)),
+				},
+				{
+					Role:    "user",
+					Content: mcp.NewTextContent("For each issue, please check if it is a clearly defined coding task with acceptance criteria and a low to medium complexity to identify issues that are suitable for an AI Coding Agent to work on. Then assign each of the identified issues to Copilot."),
+				},
+				{
+					Role:    "assistant",
+					Content: mcp.NewTextContent("Certainly! Let me carefully check which ones are clearly scoped issues that are good to assign to the coding agent, and I will summarize and assign them now."),
+				},
+				{
+					Role:    "user",
+					Content: mcp.NewTextContent("Great, if you are unsure if an issue is good to assign, ask me first, rather than assigning copilot. If you are certain the issue is clear and suitable you can assign it to Copilot without asking."),
+				},
+			}
+			return &mcp.GetPromptResult{
+				Messages: messages,
+			}, nil
+		}
+}
+
 // Label Management
 
 // Create label
@@ -2087,74 +2155,4 @@ func DeleteLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFu
 
 			return mcp.NewToolResultText(fmt.Sprintf("label %s deleted successfully", name)), nil
 		}
-}
-
-// ReplaceActorsForAssignableInput represents the input for replacing actors for an assignable entity.
-// Used in the AssignCopilotToIssue tool to assign Copilot to an issue.
-type ReplaceActorsForAssignableInput struct {
-	AssignableID githubv4.ID   `json:"assignableId"`
-	ActorIDs     []githubv4.ID `json:"actorIds"`
-}
-
-func AssignCodingAgentPrompt(t translations.TranslationHelperFunc) (tool mcp.Prompt, handler server.PromptHandlerFunc) {
-	return mcp.NewPrompt("AssignCodingAgent",
-			mcp.WithPromptDescription(t("PROMPT_ASSIGN_CODING_AGENT_DESCRIPTION", "Assign GitHub Coding Agent to multiple tasks in a GitHub repository.")),
-			mcp.WithArgument("repo", mcp.ArgumentDescription("The repository to assign tasks in (owner/repo)."), mcp.RequiredArgument()),
-		), func(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-			repo := request.Params.Arguments["repo"]
-
-			messages := []mcp.PromptMessage{
-				{
-					Role:    "user",
-					Content: mcp.NewTextContent("You are a personal assistant for GitHub the Copilot GitHub Coding Agent. Your task is to help the user assign tasks to the Coding Agent based on their open GitHub issues. You can use `assign_copilot_to_issue` tool to assign the Coding Agent to issues that are suitable for autonomous work, and `search_issues` tool to find issues that match the user's criteria. You can also use `list_issues` to get a list of issues in the repository."),
-				},
-				{
-					Role:    "user",
-					Content: mcp.NewTextContent(fmt.Sprintf("Please go and get a list of the most recent 10 issues from the %s GitHub repository", repo)),
-				},
-				{
-					Role:    "assistant",
-					Content: mcp.NewTextContent(fmt.Sprintf("Sure! I will get a list of the 10 most recent issues for the repo %s.", repo)),
-				},
-				{
-					Role:    "user",
-					Content: mcp.NewTextContent("For each issue, please check if it is a clearly defined coding task with acceptance criteria and a low to medium complexity to identify issues that are suitable for an AI Coding Agent to work on. Then assign each of the identified issues to Copilot."),
-				},
-				{
-					Role:    "assistant",
-					Content: mcp.NewTextContent("Certainly! Let me carefully check which ones are clearly scoped issues that are good to assign to the coding agent, and I will summarize and assign them now."),
-				},
-				{
-					Role:    "user",
-					Content: mcp.NewTextContent("Great, if you are unsure if an issue is good to assign, ask me first, rather than assigning copilot. If you are certain the issue is clear and suitable you can assign it to Copilot without asking."),
-				},
-			}
-			return &mcp.GetPromptResult{
-				Messages: messages,
-			}, nil
-		}
-}
-
-// parseISOTimestamp parses an ISO 8601 timestamp string into a time.Time object.
-// Returns the parsed time or an error if parsing fails.
-// Example formats supported: "2023-01-15T14:30:00Z", "2023-01-15"
-func parseISOTimestamp(timestamp string) (time.Time, error) {
-	if timestamp == "" {
-		return time.Time{}, fmt.Errorf("empty timestamp")
-	}
-
-	// Try RFC3339 format (standard ISO 8601 with time)
-	t, err := time.Parse(time.RFC3339, timestamp)
-	if err == nil {
-		return t, nil
-	}
-
-	// Try simple date format (YYYY-MM-DD)
-	t, err = time.Parse("2006-01-02", timestamp)
-	if err == nil {
-		return t, nil
-	}
-
-	// Return error with supported formats
-	return time.Time{}, fmt.Errorf("invalid ISO 8601 timestamp: %s (supported formats: YYYY-MM-DDThh:mm:ssZ or YYYY-MM-DD)", timestamp)
 }
