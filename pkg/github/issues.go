@@ -1871,12 +1871,12 @@ func CreateLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFu
 		}
 }
 
-// Get label
+// GetLabel handles both listing all labels and getting a specific label
 func GetLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("get_label",
-			mcp.WithDescription(t("TOOL_GET_LABEL_DESCRIPTION", "Get a label in a GitHub repository.")),
+			mcp.WithDescription(t("TOOL_GET_LABEL_DESCRIPTION", "Get a label from a specific repository. If no label name is provided, lists all labels in the repository.")),
 			mcp.WithToolAnnotation(mcp.ToolAnnotation{
-				Title:        t("TOOL_GET_LABEL_TITLE", "Get label"),
+				Title:        t("TOOL_GET_LABEL_TITLE", "Get/List labels"),
 				ReadOnlyHint: ToBoolPtr(true),
 			}),
 			mcp.WithString("owner",
@@ -1888,8 +1888,7 @@ func GetLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc)
 				mcp.Description("Repository name"),
 			),
 			mcp.WithString("name",
-				mcp.Required(),
-				mcp.Description("Name of the label to retrieve"),
+				mcp.Description("Name of the label to retrieve. If not provided, lists all labels in the repository."),
 			),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -1901,7 +1900,7 @@ func GetLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			name, err := RequiredParam[string](request, "name")
+			name, err := OptionalParam[string](request, "name")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -1911,42 +1910,104 @@ func GetLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc)
 				return nil, fmt.Errorf("failed to get GitHub client: %w", err)
 			}
 
+			// If name is provided, get specific label
+			if name != "" {
+				var query struct {
+					Repository struct {
+						Label struct {
+							ID          githubv4.ID
+							Name        githubv4.String
+							Color       githubv4.String
+							Description githubv4.String
+						} `graphql:"label(name: $name)"`
+					} `graphql:"repository(owner: $owner, name: $repo)"`
+				}
+
+				vars := map[string]any{
+					"owner": githubv4.String(owner),
+					"repo":  githubv4.String(repo),
+					"name":  githubv4.String(name),
+				}
+
+				if err := client.Query(ctx, &query, vars); err != nil {
+					return ghErrors.NewGitHubGraphQLErrorResponse(ctx, "Failed to find label", err), nil
+				}
+
+				// If label wasn't found, return a helpful error
+				if query.Repository.Label.Name == "" {
+					return mcp.NewToolResultError(fmt.Sprintf("label '%s' not found in %s/%s", name, owner, repo)), nil
+				}
+
+				label := map[string]any{
+					"id":          fmt.Sprintf("%v", query.Repository.Label.ID),
+					"name":        string(query.Repository.Label.Name),
+					"color":       string(query.Repository.Label.Color),
+					"description": string(query.Repository.Label.Description),
+				}
+
+				out, err := json.Marshal(label)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal label: %w", err)
+				}
+
+				return mcp.NewToolResultText(string(out)), nil
+			}
+
+			// If no name provided, list all labels
 			var query struct {
 				Repository struct {
-					Label struct {
-						ID          githubv4.ID
-						Name        githubv4.String
-						Color       githubv4.String
-						Description githubv4.String
-					} `graphql:"label(name: $name)"`
+					Labels struct {
+						Nodes []struct {
+							ID          githubv4.ID
+							Name        githubv4.String
+							Color       githubv4.String
+							Description githubv4.String
+						}
+						PageInfo struct {
+							HasNextPage     githubv4.Boolean
+							HasPreviousPage githubv4.Boolean
+							StartCursor     githubv4.String
+							EndCursor       githubv4.String
+						}
+						TotalCount githubv4.Int
+					} `graphql:"labels(first: 100)"`
 				} `graphql:"repository(owner: $owner, name: $repo)"`
 			}
 
 			vars := map[string]any{
 				"owner": githubv4.String(owner),
 				"repo":  githubv4.String(repo),
-				"name":  githubv4.String(name),
 			}
 
 			if err := client.Query(ctx, &query, vars); err != nil {
-				return ghErrors.NewGitHubGraphQLErrorResponse(ctx, "Failed to find label", err), nil
+				return ghErrors.NewGitHubGraphQLErrorResponse(ctx, "Failed to list labels", err), nil
 			}
 
-			// If label wasn't found, return a helpful error
-			if query.Repository.Label.Name == "" {
-				return mcp.NewToolResultError(fmt.Sprintf("label '%s' not found in %s/%s", name, owner, repo)), nil
+			var labels []map[string]any
+			for _, label := range query.Repository.Labels.Nodes {
+				labels = append(labels, map[string]any{
+					"id":          fmt.Sprintf("%v", label.ID),
+					"name":        string(label.Name),
+					"color":       string(label.Color),
+					"description": string(label.Description),
+				})
 			}
 
-			label := map[string]any{
-				"id":          fmt.Sprintf("%v", query.Repository.Label.ID),
-				"name":        string(query.Repository.Label.Name),
-				"color":       string(query.Repository.Label.Color),
-				"description": string(query.Repository.Label.Description),
+			response := map[string]any{
+				"labels": labels,
+				"count":  len(labels),
+				"pageInfo": map[string]any{
+					"hasNextPage":     bool(query.Repository.Labels.PageInfo.HasNextPage),
+					"hasPreviousPage": bool(query.Repository.Labels.PageInfo.HasPreviousPage),
+					"startCursor":     string(query.Repository.Labels.PageInfo.StartCursor),
+					"endCursor":       string(query.Repository.Labels.PageInfo.EndCursor),
+				},
+				"totalCount": int(query.Repository.Labels.TotalCount),
 			}
 
-			out, err := json.Marshal(label)
+			out, err := json.Marshal(response)
 			if err != nil {
-				return nil, fmt.Errorf("failed to marshal label: %w", err)
+				return nil, fmt.Errorf("failed to marshal labels: %w", err)
 			}
 
 			return mcp.NewToolResultText(string(out)), nil
