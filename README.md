@@ -532,6 +532,15 @@ The following sets of tools are available (all are on by default):
   - `title`: Issue title (string, required)
   - `type`: Type of this issue (string, optional)
 
+- **crud_label** - CRUD label
+  - `color`: Label color as a 6-character hex code without '#', e.g. 'f29513' (create/update) (string, optional)
+  - `description`: Label description (create/update) (string, optional)
+  - `method`: Operation to perform: create, get, update or delete (string, required)
+  - `name`: Label name (for get/update/delete or to create with this name). For 'get' method: optional - if provided, gets specific label; if omitted, lists all labels. (string, optional)
+  - `new_name`: New name for the label (update only) (string, optional)
+  - `owner`: Repository owner (string, optional)
+  - `repo`: Repository name (string, optional)
+
 - **get_issue** - Get issue details
   - `issue_number`: The number of the issue (number, required)
   - `owner`: The owner of the repository (string, required)
@@ -542,6 +551,13 @@ The following sets of tools are available (all are on by default):
   - `owner`: Repository owner (string, required)
   - `page`: Page number for pagination (min 1) (number, optional)
   - `perPage`: Results per page for pagination (min 1, max 100) (number, optional)
+  - `repo`: Repository name (string, required)
+
+- **issue_label** - Manage issue labels
+  - `issue_number`: Issue number (number, required)
+  - `labels`: Label names for add/remove operations (not used for list) (string[], optional)
+  - `method`: Operation to perform: list, add, or remove (string, required)
+  - `owner`: Repository owner (string, required)
   - `repo`: Repository name (string, required)
 
 - **list_issue_types** - List available issue types
