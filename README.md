@@ -510,6 +510,12 @@ The following sets of tools are available (all are on by default):
   - `owner`: Repository owner (string, required)
   - `repo`: Repository name (string, required)
 
+- **add_issue_labels** - Add issue labels
+  - `issue_number`: Issue number (number, required)
+  - `labels`: Label names to add to the issue (string[], required)
+  - `owner`: Repository owner (string, required)
+  - `repo`: Repository name (string, required)
+
 - **add_sub_issue** - Add sub-issue
   - `issue_number`: The number of the parent issue (number, required)
   - `owner`: Repository owner (string, required)
@@ -532,6 +538,18 @@ The following sets of tools are available (all are on by default):
   - `title`: Issue title (string, required)
   - `type`: Type of this issue (string, optional)
 
+- **create_label** - Create label
+  - `color`: Label color as a 6-character hex code without '#', e.g. 'f29513' (string, required)
+  - `description`: Label description (string, optional)
+  - `name`: Name of the label to create (string, required)
+  - `owner`: Repository owner (string, required)
+  - `repo`: Repository name (string, required)
+
+- **delete_label** - Delete label
+  - `name`: Name of the label to delete (string, required)
+  - `owner`: Repository owner (string, required)
+  - `repo`: Repository name (string, required)
+
 - **get_issue** - Get issue details
   - `issue_number`: The number of the issue (number, required)
   - `owner`: The owner of the repository (string, required)
@@ -542,6 +560,16 @@ The following sets of tools are available (all are on by default):
   - `owner`: Repository owner (string, required)
   - `page`: Page number for pagination (min 1) (number, optional)
   - `perPage`: Results per page for pagination (min 1, max 100) (number, optional)
+  - `repo`: Repository name (string, required)
+
+- **get_labels** - Get/List labels
+  - `name`: Name of the label to retrieve. If not provided, lists all labels in the repository. (string, optional)
+  - `owner`: Repository owner (string, required)
+  - `repo`: Repository name (string, required)
+
+- **list_issue_labels** - List issue labels
+  - `issue_number`: Issue number (number, required)
+  - `owner`: Repository owner (string, required)
   - `repo`: Repository name (string, required)
 
 - **list_issue_types** - List available issue types
@@ -563,6 +591,12 @@ The following sets of tools are available (all are on by default):
   - `owner`: Repository owner (string, required)
   - `page`: Page number for pagination (default: 1) (number, optional)
   - `per_page`: Number of results per page (max 100, default: 30) (number, optional)
+  - `repo`: Repository name (string, required)
+
+- **remove_issue_labels** - Remove issue labels
+  - `issue_number`: Issue number (number, required)
+  - `labels`: Label names to remove from the issue (string[], required)
+  - `owner`: Repository owner (string, required)
   - `repo`: Repository name (string, required)
 
 - **remove_sub_issue** - Remove sub-issue
@@ -601,6 +635,14 @@ The following sets of tools are available (all are on by default):
   - `state_reason`: Reason for the state change. Ignored unless state is changed. (string, optional)
   - `title`: New title (string, optional)
   - `type`: New issue type (string, optional)
+
+- **update_label** - Update label
+  - `color`: New label color as a 6-character hex code without '#', e.g. 'f29513' (string, optional)
+  - `description`: New label description (string, optional)
+  - `name`: Name of the existing label to update (string, required)
+  - `new_name`: New name for the label (string, optional)
+  - `owner`: Repository owner (string, required)
+  - `repo`: Repository name (string, required)
 
 </details>
 
