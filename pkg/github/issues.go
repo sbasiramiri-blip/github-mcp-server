@@ -2204,7 +2204,7 @@ func IssueLabel(getClient GetClientFn, t translations.TranslationHelperFunc) (mc
 
 				response := map[string]any{
 					"labels": issueLabels,
-					"count":  len(issueLabels),
+					"totalCount":  len(issueLabels),
 				}
 
 				out, err := json.Marshal(response)
@@ -2248,7 +2248,7 @@ func IssueLabel(getClient GetClientFn, t translations.TranslationHelperFunc) (mc
 
 				response := map[string]any{
 					"labels": issueLabels,
-					"count":  len(issueLabels),
+					"totalCount":  len(issueLabels),
 					"added":  labels,
 				}
 
@@ -2302,7 +2302,7 @@ func IssueLabel(getClient GetClientFn, t translations.TranslationHelperFunc) (mc
 
 				response := map[string]any{
 					"labels":  issueLabels,
-					"count":   len(issueLabels),
+					"totalCount":   len(issueLabels),
 					"removed": labels,
 				}
 
