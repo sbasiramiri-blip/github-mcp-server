@@ -1872,9 +1872,9 @@ func CreateLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFu
 }
 
 // GetLabel handles both listing all labels and getting a specific label
-func GetLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
-	return mcp.NewTool("get_label",
-			mcp.WithDescription(t("TOOL_GET_LABEL_DESCRIPTION", "Get a label from a specific repository. If no label name is provided, lists all labels in the repository.")),
+func GetLabels(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
+	return mcp.NewTool("get_labels",
+			mcp.WithDescription(t("TOOL_GET_LABEL_DESCRIPTION", "Get a label from a specific repository. If no label name is provided, lists all labels.")),
 			mcp.WithToolAnnotation(mcp.ToolAnnotation{
 				Title:        t("TOOL_GET_LABEL_TITLE", "Get/List labels"),
 				ReadOnlyHint: ToBoolPtr(true),
