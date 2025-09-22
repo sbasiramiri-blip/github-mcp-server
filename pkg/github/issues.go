@@ -42,7 +42,7 @@ const (
 // When duplicateOf is non-zero, it fetches both the main issue and duplicate issue IDs in a single query.
 func fetchIssueIDs(ctx context.Context, gqlClient *githubv4.Client, owner, repo string, issueNumber int, duplicateOf int) (githubv4.ID, githubv4.ID, error) {
 	// Build query variables common to both cases
-	vars := map[string]interface{}{
+	vars := map[string]any{
 		"owner":       githubv4.String(owner),
 		"repo":        githubv4.String(repo),
 		"issueNumber": githubv4.Int(issueNumber), // #nosec G115 - issue numbers are always small positive integers
@@ -991,7 +991,7 @@ func ListIssues(getGQLClient GetGQLClientFn, t translations.TranslationHelperFun
 			mcp.WithArray("labels",
 				mcp.Description("Filter by labels"),
 				mcp.Items(
-					map[string]interface{}{
+					map[string]any{
 						"type": "string",
 					},
 				),
@@ -1107,7 +1107,7 @@ func ListIssues(getGQLClient GetGQLClientFn, t translations.TranslationHelperFun
 				return mcp.NewToolResultError(fmt.Sprintf("failed to get GitHub GQL client: %v", err)), nil
 			}
 
-			vars := map[string]interface{}{
+			vars := map[string]any{
 				"owner":     githubv4.String(owner),
 				"repo":      githubv4.String(repo),
 				"states":    states,
@@ -1162,9 +1162,9 @@ func ListIssues(getGQLClient GetGQLClientFn, t translations.TranslationHelperFun
 			}
 
 			// Create response with issues
-			response := map[string]interface{}{
+			response := map[string]any{
 				"issues": issues,
-				"pageInfo": map[string]interface{}{
+				"pageInfo": map[string]any{
 					"hasNextPage":     pageInfo.HasNextPage,
 					"hasPreviousPage": pageInfo.HasPreviousPage,
 					"startCursor":     string(pageInfo.StartCursor),
@@ -1209,7 +1209,7 @@ func UpdateIssue(getClient GetClientFn, getGQLClient GetGQLClientFn, t translati
 			mcp.WithArray("labels",
 				mcp.Description("New labels"),
 				mcp.Items(
-					map[string]interface{}{
+					map[string]any{
 						"type": "string",
 					},
 				),
@@ -1217,7 +1217,7 @@ func UpdateIssue(getClient GetClientFn, getGQLClient GetGQLClientFn, t translati
 			mcp.WithArray("assignees",
 				mcp.Description("New assignees"),
 				mcp.Items(
-					map[string]interface{}{
+					map[string]any{
 						"type": "string",
 					},
 				),
@@ -1937,7 +1937,7 @@ func GetLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc)
 				return mcp.NewToolResultError(fmt.Sprintf("label '%s' not found in %s/%s", name, owner, repo)), nil
 			}
 
-			label := map[string]interface{}{
+			label := map[string]any{
 				"id":          fmt.Sprintf("%v", query.Repository.Label.ID),
 				"name":        string(query.Repository.Label.Name),
 				"color":       string(query.Repository.Label.Color),
@@ -2304,7 +2304,7 @@ func CRUDLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc
 						return mcp.NewToolResultError(fmt.Sprintf("label '%s' not found in %s/%s", name, owner, repo)), nil
 					}
 
-					label := map[string]interface{}{
+					label := map[string]any{
 						"id":          fmt.Sprintf("%v", query.Repository.Label.ID),
 						"name":        string(query.Repository.Label.Name),
 						"color":       string(query.Repository.Label.Color),
@@ -2342,9 +2342,9 @@ func CRUDLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc
 						return ghErrors.NewGitHubGraphQLErrorResponse(ctx, "Failed to list labels", err), nil
 					}
 
-					labels := make([]map[string]interface{}, len(query.Repository.Labels.Nodes))
+					labels := make([]map[string]any, len(query.Repository.Labels.Nodes))
 					for i, labelNode := range query.Repository.Labels.Nodes {
-						labels[i] = map[string]interface{}{
+						labels[i] = map[string]any{
 							"id":          fmt.Sprintf("%v", labelNode.ID),
 							"name":        string(labelNode.Name),
 							"color":       string(labelNode.Color),
@@ -2352,7 +2352,7 @@ func CRUDLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc
 						}
 					}
 
-					response := map[string]interface{}{
+					response := map[string]any{
 						"labels":     labels,
 						"totalCount": int(query.Repository.Labels.TotalCount),
 					}
@@ -2492,3 +2492,509 @@ func CRUDLabel(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc
 		}
 }
 
+// IssueLabel manages labels on GitHub issues with list, add, and remove operations.
+func IssueLabel(getClient GetClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
+	return mcp.NewTool("issue_label",
+			mcp.WithDescription(t("TOOL_ISSUE_LABEL_DESCRIPTION", "Manage labels on GitHub issues. Use 'list' to get current labels on an issue, 'add' to add labels to an issue, or 'remove' to remove labels from an issue.")),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:        t("TOOL_ISSUE_LABEL_TITLE", "Manage issue labels"),
+				ReadOnlyHint: ToBoolPtr(false),
+			}),
+			mcp.WithString("method",
+				mcp.Required(),
+				mcp.Description("Operation to perform: list, add, or remove"),
+				mcp.Enum("list", "add", "remove"),
+			),
+			mcp.WithString("owner",
+				mcp.Required(),
+				mcp.Description("Repository owner"),
+			),
+			mcp.WithString("repo",
+				mcp.Required(),
+				mcp.Description("Repository name"),
+			),
+			mcp.WithNumber("issue_number",
+				mcp.Required(),
+				mcp.Description("Issue number"),
+			),
+			mcp.WithArray("labels",
+				mcp.Description("Label names for add/remove operations (not used for list)"),
+				mcp.Items(
+					map[string]any{
+						"type": "string",
+					},
+				),
+			),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			method, err := RequiredParam[string](request, "method")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			owner, err := RequiredParam[string](request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			repo, err := RequiredParam[string](request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			issueNumber, err := RequiredInt(request, "issue_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			// Normalize method
+			method = strings.ToLower(method)
+
+			// Get labels parameter for add/remove operations
+			labels, err := OptionalStringArrayParam(request, "labels")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			client, err := getClient(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get GitHub client: %w", err)
+			}
+
+			switch method {
+			case "list":
+				// Get current labels on the issue
+				issue, resp, err := client.Issues.Get(ctx, owner, repo, issueNumber)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get issue: %w", err)
+				}
+				defer func() { _ = resp.Body.Close() }()
+
+				if resp.StatusCode != http.StatusOK {
+					body, err := io.ReadAll(resp.Body)
+					if err != nil {
+						return mcp.NewToolResultError("failed to read response body"), nil
+					}
+					return mcp.NewToolResultError(fmt.Sprintf("failed to get issue: %s", string(body))), nil
+				}
+
+				// Extract label information
+				issueLabels := make([]map[string]any, len(issue.Labels))
+				for i, label := range issue.Labels {
+					issueLabels[i] = map[string]any{
+						"id":          fmt.Sprintf("%d", label.GetID()),
+						"name":        label.GetName(),
+						"color":       label.GetColor(),
+						"description": label.GetDescription(),
+					}
+				}
+
+				response := map[string]any{
+					"labels": issueLabels,
+					"count":  len(issueLabels),
+				}
+
+				out, err := json.Marshal(response)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal response: %w", err)
+				}
+
+				return mcp.NewToolResultText(string(out)), nil
+
+			case "add":
+				// Validate labels parameter for add operation
+				if len(labels) == 0 {
+					return mcp.NewToolResultError("labels parameter is required for add operation"), nil
+				}
+
+				// Add labels to the issue
+				updatedLabels, resp, err := client.Issues.AddLabelsToIssue(ctx, owner, repo, issueNumber, labels)
+				if err != nil {
+					return nil, fmt.Errorf("failed to add labels to issue: %w", err)
+				}
+				defer func() { _ = resp.Body.Close() }()
+
+				if resp.StatusCode != http.StatusOK {
+					body, err := io.ReadAll(resp.Body)
+					if err != nil {
+						return mcp.NewToolResultError("failed to read response body"), nil
+					}
+					return mcp.NewToolResultError(fmt.Sprintf("failed to add labels to issue: %s", string(body))), nil
+				}
+
+				// Return the updated labels
+				issueLabels := make([]map[string]any, len(updatedLabels))
+				for i, label := range updatedLabels {
+					issueLabels[i] = map[string]any{
+						"id":          fmt.Sprintf("%d", label.GetID()),
+						"name":        label.GetName(),
+						"color":       label.GetColor(),
+						"description": label.GetDescription(),
+					}
+				}
+
+				response := map[string]any{
+					"labels": issueLabels,
+					"count":  len(issueLabels),
+					"added":  labels,
+				}
+
+				out, err := json.Marshal(response)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal response: %w", err)
+				}
+
+				return mcp.NewToolResultText(string(out)), nil
+
+			case "remove":
+				// Validate labels parameter for remove operation
+				if len(labels) == 0 {
+					return mcp.NewToolResultError("labels parameter is required for remove operation"), nil
+				}
+
+				// Remove labels from the issue
+				for _, labelName := range labels {
+					resp, err := client.Issues.RemoveLabelForIssue(ctx, owner, repo, issueNumber, labelName)
+					if err != nil {
+						return nil, fmt.Errorf("failed to remove label '%s' from issue: %w", labelName, err)
+					}
+					defer func() { _ = resp.Body.Close() }()
+
+					if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+						body, err := io.ReadAll(resp.Body)
+						if err != nil {
+							return mcp.NewToolResultError("failed to read response body"), nil
+						}
+						return mcp.NewToolResultError(fmt.Sprintf("failed to remove label '%s' from issue: %s", labelName, string(body))), nil
+					}
+				}
+
+				// Get the updated issue to return current labels
+				issue, resp, err := client.Issues.Get(ctx, owner, repo, issueNumber)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get updated issue: %w", err)
+				}
+				defer func() { _ = resp.Body.Close() }()
+
+				// Extract remaining label information
+				issueLabels := make([]map[string]any, len(issue.Labels))
+				for i, label := range issue.Labels {
+					issueLabels[i] = map[string]any{
+						"id":          fmt.Sprintf("%d", label.GetID()),
+						"name":        label.GetName(),
+						"color":       label.GetColor(),
+						"description": label.GetDescription(),
+					}
+				}
+
+				response := map[string]any{
+					"labels":  issueLabels,
+					"count":   len(issueLabels),
+					"removed": labels,
+				}
+
+				out, err := json.Marshal(response)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal response: %w", err)
+				}
+
+				return mcp.NewToolResultText(string(out)), nil
+
+			default:
+				return mcp.NewToolResultError(fmt.Sprintf("unknown method: %s", method)), nil
+			}
+		}
+}
+
+// ListIssueLabels creates a tool to list current labels on a GitHub issue.
+func ListIssueLabels(getClient GetClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
+	return mcp.NewTool("list_issue_labels",
+			mcp.WithDescription(t("TOOL_LIST_ISSUE_LABELS_DESCRIPTION", "Get current labels on a GitHub issue.")),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:        t("TOOL_LIST_ISSUE_LABELS_TITLE", "List issue labels"),
+				ReadOnlyHint: ToBoolPtr(true),
+			}),
+			mcp.WithString("owner",
+				mcp.Required(),
+				mcp.Description("Repository owner"),
+			),
+			mcp.WithString("repo",
+				mcp.Required(),
+				mcp.Description("Repository name"),
+			),
+			mcp.WithNumber("issue_number",
+				mcp.Required(),
+				mcp.Description("Issue number"),
+			),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			owner, err := RequiredParam[string](request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			repo, err := RequiredParam[string](request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			issueNumber, err := RequiredInt(request, "issue_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			client, err := getClient(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get GitHub client: %w", err)
+			}
+
+			// Get current labels on the issue
+			issue, resp, err := client.Issues.Get(ctx, owner, repo, issueNumber)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get issue: %w", err)
+			}
+			defer func() { _ = resp.Body.Close() }()
+
+			if resp.StatusCode != http.StatusOK {
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return mcp.NewToolResultError("failed to read response body"), nil
+				}
+				return mcp.NewToolResultError(fmt.Sprintf("failed to get issue: %s", string(body))), nil
+			}
+
+			// Extract label information
+			issueLabels := make([]map[string]interface{}, len(issue.Labels))
+			for i, label := range issue.Labels {
+				issueLabels[i] = map[string]interface{}{
+					"id":          fmt.Sprintf("%d", label.GetID()),
+					"name":        label.GetName(),
+					"color":       label.GetColor(),
+					"description": label.GetDescription(),
+				}
+			}
+
+			response := map[string]interface{}{
+				"labels": issueLabels,
+				"count":  len(issueLabels),
+			}
+
+			out, err := json.Marshal(response)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal response: %w", err)
+			}
+
+			return mcp.NewToolResultText(string(out)), nil
+		}
+}
+
+// AddIssueLabels creates a tool to add labels to a GitHub issue.
+func AddIssueLabels(getClient GetClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
+	return mcp.NewTool("add_issue_labels",
+			mcp.WithDescription(t("TOOL_ADD_ISSUE_LABELS_DESCRIPTION", "Add labels to a GitHub issue.")),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:        t("TOOL_ADD_ISSUE_LABELS_TITLE", "Add issue labels"),
+				ReadOnlyHint: ToBoolPtr(false),
+			}),
+			mcp.WithString("owner",
+				mcp.Required(),
+				mcp.Description("Repository owner"),
+			),
+			mcp.WithString("repo",
+				mcp.Required(),
+				mcp.Description("Repository name"),
+			),
+			mcp.WithNumber("issue_number",
+				mcp.Required(),
+				mcp.Description("Issue number"),
+			),
+			mcp.WithArray("labels",
+				mcp.Required(),
+				mcp.Description("Label names to add to the issue"),
+				mcp.Items(
+					map[string]interface{}{
+						"type": "string",
+					},
+				),
+			),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			owner, err := RequiredParam[string](request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			repo, err := RequiredParam[string](request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			issueNumber, err := RequiredInt(request, "issue_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			labels, err := OptionalStringArrayParam(request, "labels")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			if len(labels) == 0 {
+				return mcp.NewToolResultError("at least one label is required"), nil
+			}
+
+			client, err := getClient(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get GitHub client: %w", err)
+			}
+
+			// Add labels to the issue
+			updatedLabels, resp, err := client.Issues.AddLabelsToIssue(ctx, owner, repo, issueNumber, labels)
+			if err != nil {
+				return nil, fmt.Errorf("failed to add labels to issue: %w", err)
+			}
+			defer func() { _ = resp.Body.Close() }()
+
+			if resp.StatusCode != http.StatusOK {
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return mcp.NewToolResultError("failed to read response body"), nil
+				}
+				return mcp.NewToolResultError(fmt.Sprintf("failed to add labels to issue: %s", string(body))), nil
+			}
+
+			// Return the updated labels
+			issueLabels := make([]map[string]interface{}, len(updatedLabels))
+			for i, label := range updatedLabels {
+				issueLabels[i] = map[string]interface{}{
+					"id":          fmt.Sprintf("%d", label.GetID()),
+					"name":        label.GetName(),
+					"color":       label.GetColor(),
+					"description": label.GetDescription(),
+				}
+			}
+
+			response := map[string]interface{}{
+				"labels": issueLabels,
+				"count":  len(issueLabels),
+				"added":  labels,
+			}
+
+			out, err := json.Marshal(response)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal response: %w", err)
+			}
+
+			return mcp.NewToolResultText(string(out)), nil
+		}
+}
+
+// RemoveIssueLabels creates a tool to remove labels from a GitHub issue.
+func RemoveIssueLabels(getClient GetClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
+	return mcp.NewTool("remove_issue_labels",
+			mcp.WithDescription(t("TOOL_REMOVE_ISSUE_LABELS_DESCRIPTION", "Remove labels from a GitHub issue.")),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:        t("TOOL_REMOVE_ISSUE_LABELS_TITLE", "Remove issue labels"),
+				ReadOnlyHint: ToBoolPtr(false),
+			}),
+			mcp.WithString("owner",
+				mcp.Required(),
+				mcp.Description("Repository owner"),
+			),
+			mcp.WithString("repo",
+				mcp.Required(),
+				mcp.Description("Repository name"),
+			),
+			mcp.WithNumber("issue_number",
+				mcp.Required(),
+				mcp.Description("Issue number"),
+			),
+			mcp.WithArray("labels",
+				mcp.Required(),
+				mcp.Description("Label names to remove from the issue"),
+				mcp.Items(
+					map[string]interface{}{
+						"type": "string",
+					},
+				),
+			),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			owner, err := RequiredParam[string](request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			repo, err := RequiredParam[string](request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			issueNumber, err := RequiredInt(request, "issue_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			labels, err := OptionalStringArrayParam(request, "labels")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			if len(labels) == 0 {
+				return mcp.NewToolResultError("at least one label is required"), nil
+			}
+
+			client, err := getClient(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get GitHub client: %w", err)
+			}
+
+			// Remove labels from the issue
+			for _, labelName := range labels {
+				resp, err := client.Issues.RemoveLabelForIssue(ctx, owner, repo, issueNumber, labelName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to remove label '%s' from issue: %w", labelName, err)
+				}
+				defer func() { _ = resp.Body.Close() }()
+
+				if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+					body, err := io.ReadAll(resp.Body)
+					if err != nil {
+						return mcp.NewToolResultError("failed to read response body"), nil
+					}
+					return mcp.NewToolResultError(fmt.Sprintf("failed to remove label '%s' from issue: %s", labelName, string(body))), nil
+				}
+			}
+
+			// Get the updated issue to return current labels
+			issue, resp, err := client.Issues.Get(ctx, owner, repo, issueNumber)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get updated issue: %w", err)
+			}
+			defer func() { _ = resp.Body.Close() }()
+
+			// Extract remaining label information
+			issueLabels := make([]map[string]interface{}, len(issue.Labels))
+			for i, label := range issue.Labels {
+				issueLabels[i] = map[string]interface{}{
+					"id":          fmt.Sprintf("%d", label.GetID()),
+					"name":        label.GetName(),
+					"color":       label.GetColor(),
+					"description": label.GetDescription(),
+				}
+			}
+
+			response := map[string]interface{}{
+				"labels":  issueLabels,
+				"count":   len(issueLabels),
+				"removed": labels,
+			}
+
+			out, err := json.Marshal(response)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal response: %w", err)
+			}
+
+			return mcp.NewToolResultText(string(out)), nil
+		}
+}
