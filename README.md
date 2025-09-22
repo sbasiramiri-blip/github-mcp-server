@@ -551,7 +551,7 @@ The following sets of tools are available (all are on by default):
   - `owner`: Repository owner (username or organization name) - required for all operations (string, required)
   - `repo`: Repository name - required for all operations (string, required)
 
-- **label** - Manage label operations - create, read, update, delete
+- **labels** - Manage label operations - create, read, update, delete
   - `color`: Label color as 6-character hex code without '#' prefix, e.g. 'f29513' for orange. REQUIRED for 'create', OPTIONAL for 'update'. (string, optional)
   - `description`: Label description text. OPTIONAL for both 'create' and 'update' operations. (string, optional)
   - `method`: Create/Read/Update/Delete a github label. (string, required)

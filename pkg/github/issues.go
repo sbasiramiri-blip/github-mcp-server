@@ -1771,11 +1771,11 @@ func AssignCodingAgentPrompt(t translations.TranslationHelperFunc) (tool mcp.Pro
 // Label Management
 
 // Label consolidates Create/Get/Update/Delete label operations into a single tool.
-func Label(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
-	return mcp.NewTool("label",
-			mcp.WithDescription(t("TOOL_LABEL_DESCRIPTION", "Create, read, update, or delete repository labels in GitHub. Labels are organizational tags used to categorize and filter issues and pull requests. METHODS: 'create', 'get' - if label parameter name is omitted, lists all labels, 'update', 'delete'.")),
+func Labels(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
+	return mcp.NewTool("labels",
+			mcp.WithDescription(t("TOOL_LABELS_DESCRIPTION", "Create, read, update, or delete repository labels in GitHub. Labels are organizational tags used to categorize and filter issues and pull requests. METHODS: 'create', 'get' - if label parameter name is omitted, lists all labels, 'update', 'delete'.")),
 			mcp.WithToolAnnotation(mcp.ToolAnnotation{
-				Title:        t("TOOL_LABEL_TITLE", "Manage label operations - create, read, update, delete"),
+				Title:        t("TOOL_LABELS_TITLE", "Manage label operations - create, read, update, delete"),
 				ReadOnlyHint: ToBoolPtr(false),
 			}),
 			mcp.WithString("method",
