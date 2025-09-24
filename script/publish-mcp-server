@@ -1,13 +1,12 @@
 #!/bin/bash
 
 # Publish MCP Server to Registry
-# Usage: ./script/publish-mcp-server [--init] [--validate] [--dry-run]
+# Usage: ./script/publish-mcp-server [--init] [--dry-run]
 
 set -e
 
-# Options
+# Parse command line options
 INIT=false
-## Always validate server.json and version
 DRY_RUN=false
 
 for arg in "$@"; do
@@ -15,70 +14,79 @@ for arg in "$@"; do
     --init)
       INIT=true
       ;;
-    # --validate flag removed; validation always runs
     --dry-run)
       DRY_RUN=true
       ;;
   esac
 done
 
-# Step 1: Ensure mcp-publisher is installed
+echo "🚀 Publishing GitHub MCP Server to Registry"
+echo "============================================"
+
+# Step 1: Ensure mcp-publisher CLI is installed
+echo "📦 Checking mcp-publisher installation..."
 if ! command -v mcp-publisher &> /dev/null; then
-  echo "mcp-publisher not found. Installing with Homebrew..."
+  echo "Installing mcp-publisher with Homebrew..."
   if command -v brew &> /dev/null; then
     brew install mcp-publisher
   else
-    echo "Homebrew not found. Please install mcp-publisher manually:"
+    echo "❌ Homebrew not found. Please install mcp-publisher manually:"
     echo "curl -L \"https://github.com/modelcontextprotocol/registry/releases/download/v1.0.0/mcp-publisher_1.0.0_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz\" | tar xz mcp-publisher && sudo mv mcp-publisher /usr/local/bin/"
     exit 1
   fi
 fi
+echo "✅ mcp-publisher is available"
 
-# Step 2: Initialize server.json if requested
-if [ "$INIT" = true ]; then
-  echo "Initializing server.json..."
-  mcp-publisher init
-fi
-
-# Step 3: Authenticate (GitHub for io.github.*)
+# Step 2: Authenticate with GitHub
+echo ""
+echo "🔐 Authenticating with MCP registry..."
 if ! mcp-publisher whoami &> /dev/null; then
-  echo "Authenticating with MCP registry (GitHub)..."
   mcp-publisher login github
 fi
+echo "✅ Authentication successful"
 
-# Step 4: Validate server.json schema
-echo "Validating server.json version against latest release tag..."
-# Get latest release tag
+# Step 3: Update version from latest git tag
+echo ""
+echo "🏷️  Updating server.json version..."
 LATEST_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$' | head -n 1)
 if [ -z "$LATEST_TAG" ]; then
-  echo "❌ No release tag found. Cannot set version."
+  echo "❌ No release tag found. Cannot determine version."
   exit 1
 fi
+
 TAG_VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
-# Set server.json version and all package versions to latest tag
 jq ".version = \"$TAG_VERSION\" | .packages[].version = \"$TAG_VERSION\"" server.json > server.json.tmp && mv server.json.tmp server.json
-echo "Set server.json version and all package versions to $TAG_VERSION (from latest release tag $LATEST_TAG)."
-# Show user and confirm
-echo "Please confirm this is the correct version to publish: $TAG_VERSION (latest tag: $LATEST_TAG)"
-read -p "Proceed with this version? (y/n) " -n 1 -r
+
+echo "✅ Updated server.json version to $TAG_VERSION (from git tag $LATEST_TAG)"
+
+# Step 4: User confirmation
+echo ""
+echo "📋 Version Summary:"
+echo "   Latest git tag: $LATEST_TAG"
+echo "   Server version: $TAG_VERSION"
+echo ""
+read -p "Proceed with publishing this version? (y/n) " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-  echo "Publish cancelled by user."
+  echo "❌ Publish cancelled by user."
   exit 1
 fi
-echo "✅ Confirmed. Proceeding with publish."
 
-# Step 5: Publish
+# Step 5: Publish to registry
+echo ""
 if [ "$DRY_RUN" = true ]; then
-  echo "DRY RUN: Skipping actual publish."
+  echo "🧪 DRY RUN: Skipping actual publish step"
 else
-  echo "Publishing MCP server..."
+  echo "📤 Publishing to MCP registry..."
   mcp-publisher publish
+  echo "✅ Successfully published!"
 fi
 
 # Step 6: Verify publication
+echo ""
+echo "🔍 Verifying server in registry..."
 SERVER_NAME=$(jq -r .name server.json)
-echo "Verifying server in registry..."
 curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=$SERVER_NAME" | jq
 
-echo "Done."
+echo ""
+echo "🎉 Done!"
