@@ -11,7 +11,7 @@
   "packages": [
     {
       "registryType": "oci",
-      "registryBaseUrl": "https://docker.io",
+      "registryBaseUrl": "https://ghcr.io",
       "identifier": "ghcr.io/github/github-mcp-server",
       "version": "0.0.0",
       "runtimeHint": "docker",
