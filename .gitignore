@@ -18,3 +18,7 @@ bin/
 
 # binary
 github-mcp-server
+
+# Registry credentials - Created on publish
+.mcpregistry_github_token
+.mcpregistry_registry_token
