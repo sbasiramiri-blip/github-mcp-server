@@ -26,7 +26,13 @@ jobs:
 
       - name: Install MCP Publisher
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/v1.0.0/mcp-publisher_1.0.0_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          # Build publisher from source (requires Go)
+          git clone https://github.com/modelcontextprotocol/registry publisher-repo
+          cd publisher-repo
+          make publisher
+          cp bin/mcp-publisher ../mcp-publisher
+          cd ..
+          chmod +x mcp-publisher
 
       - name: Update server.json version
         run: |
@@ -55,13 +61,8 @@ jobs:
           echo "JSON validation check:"
           python3 -m json.tool server.json > /dev/null && echo "✅ Valid JSON" || echo "❌ Invalid JSON"
 
-      - name: Login to MCP Registry
+      - name: Login to MCP Registry (OIDC)
         run: ./mcp-publisher login github-oidc
 
-      - name: Publish to MCP Registry (with verbose output)
-        run: |
-          echo "Publishing with verbose output..."
-          ./mcp-publisher publish --file server.json --verbose || true
-          echo ""
-          echo "Checking if mcp-publisher has other flags..."
-          ./mcp-publisher publish --help || true
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish
