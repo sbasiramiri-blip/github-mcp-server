@@ -14,7 +14,6 @@
       "registryBaseUrl": "https://ghcr.io",
       "identifier": "ghcr.io/github/github-mcp-server",
       "version": "${VERSION}",
-      "runtimeHint": "docker",
       "transport": {
         "type": "stdio"
       },

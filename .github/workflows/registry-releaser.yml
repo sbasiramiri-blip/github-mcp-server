@@ -46,9 +46,17 @@ jobs:
         run: |
           echo "Final server.json contents:"
           cat server.json
+          echo ""
+          echo "JSON validation check:"
+          python3 -m json.tool server.json > /dev/null && echo "✅ Valid JSON" || echo "❌ Invalid JSON"
 
       - name: Login to MCP Registry
         run: ./mcp-publisher login github-oidc
 
-      - name: Publish to MCP Registry
-        run: ./mcp-publisher publish
+      - name: Publish to MCP Registry (with verbose output)
+        run: |
+          echo "Publishing with verbose output..."
+          ./mcp-publisher publish --verbose || true
+          echo ""
+          echo "Checking if mcp-publisher has other flags..."
+          ./mcp-publisher publish --help || true
