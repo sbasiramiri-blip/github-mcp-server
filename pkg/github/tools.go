@@ -68,13 +68,6 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(CreateRepository(getClient, t)),
 			toolsets.NewServerTool(ForkRepository(getClient, t)),
 			toolsets.NewServerTool(CreateBranch(getClient, t)),
-		).
-		AddResourceTemplates(
-			toolsets.NewServerResourceTemplate(GetRepositoryResourceContent(getClient, getRawClient, t)),
-			toolsets.NewServerResourceTemplate(GetRepositoryResourceBranchContent(getClient, getRawClient, t)),
-			toolsets.NewServerResourceTemplate(GetRepositoryResourceCommitContent(getClient, getRawClient, t)),
-			toolsets.NewServerResourceTemplate(GetRepositoryResourceTagContent(getClient, getRawClient, t)),
-			toolsets.NewServerResourceTemplate(GetRepositoryResourcePrContent(getClient, getRawClient, t)),
 		)
 
 	contents := toolsets.NewToolset(string(ToolsetContents), "Repository contents - get, create, update, delete files and directories").
@@ -85,6 +78,13 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(CreateOrUpdateFile(getClient, t)),
 			toolsets.NewServerTool(PushFiles(getClient, t)),
 			toolsets.NewServerTool(DeleteFile(getClient, t)),
+		).
+		AddResourceTemplates(
+			toolsets.NewServerResourceTemplate(GetRepositoryResourceContent(getClient, getRawClient, t)),
+			toolsets.NewServerResourceTemplate(GetRepositoryResourceBranchContent(getClient, getRawClient, t)),
+			toolsets.NewServerResourceTemplate(GetRepositoryResourceCommitContent(getClient, getRawClient, t)),
+			toolsets.NewServerResourceTemplate(GetRepositoryResourceTagContent(getClient, getRawClient, t)),
+			toolsets.NewServerResourceTemplate(GetRepositoryResourcePrContent(getClient, getRawClient, t)),
 		)
 
 	releases := toolsets.NewToolset(string(ToolsetReleases), "GitHub Repository releases - list, get, and manage releases").
