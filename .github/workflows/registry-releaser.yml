@@ -42,6 +42,11 @@ jobs:
           sed -i "s/\${VERSION}/$TAG_VERSION/g" server.json
           echo "Updated server.json version to $TAG_VERSION"
 
+      - name: Display updated server.json
+        run: |
+          echo "Final server.json contents:"
+          cat server.json
+
       - name: Login to MCP Registry
         run: ./mcp-publisher login github-oidc
 
