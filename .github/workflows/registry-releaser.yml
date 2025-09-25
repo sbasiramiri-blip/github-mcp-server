@@ -56,7 +56,7 @@ jobs:
       - name: Publish to MCP Registry (with verbose output)
         run: |
           echo "Publishing with verbose output..."
-          ./mcp-publisher publish --verbose || true
+          ./mcp-publisher publish --file server.json --verbose || true
           echo ""
           echo "Checking if mcp-publisher has other flags..."
           ./mcp-publisher publish --help || true
