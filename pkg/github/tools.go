@@ -14,14 +14,38 @@ import (
 type GetClientFn func(context.Context) (*github.Client, error)
 type GetGQLClientFn func(context.Context) (*githubv4.Client, error)
 
-var DefaultTools = []string{"context", "repos", "issues", "pull_requests"}
+type Toolset string
+
+const (
+	ToolsetContext            Toolset = "context"
+	ToolsetRepos              Toolset = "repos"
+	ToolsetIssues             Toolset = "issues"
+	ToolsetUsers              Toolset = "users"
+	ToolsetOrgs               Toolset = "orgs"
+	ToolsetPullRequests       Toolset = "pull_requests"
+	ToolsetCodeSecurity       Toolset = "code_security"
+	ToolsetSecretProtection   Toolset = "secret_protection"
+	ToolsetDependabot         Toolset = "dependabot"
+	ToolsetNotifications      Toolset = "notifications"
+	ToolsetDiscussions        Toolset = "discussions"
+	ToolsetActions            Toolset = "actions"
+	ToolsetSecurityAdvisories Toolset = "security_advisories"
+	ToolsetExperiments        Toolset = "experiments"
+	ToolsetGists              Toolset = "gists"
+	ToolsetProjects           Toolset = "projects"
+	ToolsetStargazers         Toolset = "stargazers"
+	ToolsetDynamic            Toolset = "dynamic"
+)
+
+// DefaultTools contains the default toolsets to enable
+var DefaultTools = []Toolset{ToolsetContext, ToolsetRepos, ToolsetIssues, ToolsetPullRequests}
 
 func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetGQLClientFn, getRawClient raw.GetRawClientFn, t translations.TranslationHelperFunc, contentWindowSize int) *toolsets.ToolsetGroup {
 	tsg := toolsets.NewToolsetGroup(readOnly)
 
 	// Define all available features with their default state (disabled)
 	// Create toolsets
-	repos := toolsets.NewToolset("repos", "GitHub Repository related tools").
+	repos := toolsets.NewToolset(string(ToolsetRepos), "GitHub Repository related tools").
 		AddReadTools(
 			toolsets.NewServerTool(SearchRepositories(getClient, t)),
 			toolsets.NewServerTool(GetFileContents(getClient, getRawClient, t)),
@@ -50,7 +74,7 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerResourceTemplate(GetRepositoryResourceTagContent(getClient, getRawClient, t)),
 			toolsets.NewServerResourceTemplate(GetRepositoryResourcePrContent(getClient, getRawClient, t)),
 		)
-	issues := toolsets.NewToolset("issues", "GitHub Issues related tools").
+	issues := toolsets.NewToolset(string(ToolsetIssues), "GitHub Issues related tools").
 		AddReadTools(
 			toolsets.NewServerTool(GetIssue(getClient, t)),
 			toolsets.NewServerTool(SearchIssues(getClient, t)),
@@ -71,15 +95,15 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 		toolsets.NewServerPrompt(AssignCodingAgentPrompt(t)),
 		toolsets.NewServerPrompt(IssueToFixWorkflowPrompt(t)),
 	)
-	users := toolsets.NewToolset("users", "GitHub User related tools").
+	users := toolsets.NewToolset(string(ToolsetUsers), "GitHub User related tools").
 		AddReadTools(
 			toolsets.NewServerTool(SearchUsers(getClient, t)),
 		)
-	orgs := toolsets.NewToolset("orgs", "GitHub Organization related tools").
+	orgs := toolsets.NewToolset(string(ToolsetOrgs), "GitHub Organization related tools").
 		AddReadTools(
 			toolsets.NewServerTool(SearchOrgs(getClient, t)),
 		)
-	pullRequests := toolsets.NewToolset("pull_requests", "GitHub Pull Request related tools").
+	pullRequests := toolsets.NewToolset(string(ToolsetPullRequests), "GitHub Pull Request related tools").
 		AddReadTools(
 			toolsets.NewServerTool(GetPullRequest(getClient, t)),
 			toolsets.NewServerTool(ListPullRequests(getClient, t)),
@@ -104,23 +128,23 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(SubmitPendingPullRequestReview(getGQLClient, t)),
 			toolsets.NewServerTool(DeletePendingPullRequestReview(getGQLClient, t)),
 		)
-	codeSecurity := toolsets.NewToolset("code_security", "Code security related tools, such as GitHub Code Scanning").
+	codeSecurity := toolsets.NewToolset(string(ToolsetCodeSecurity), "Code security related tools, such as GitHub Code Scanning").
 		AddReadTools(
 			toolsets.NewServerTool(GetCodeScanningAlert(getClient, t)),
 			toolsets.NewServerTool(ListCodeScanningAlerts(getClient, t)),
 		)
-	secretProtection := toolsets.NewToolset("secret_protection", "Secret protection related tools, such as GitHub Secret Scanning").
+	secretProtection := toolsets.NewToolset(string(ToolsetSecretProtection), "Secret protection related tools, such as GitHub Secret Scanning").
 		AddReadTools(
 			toolsets.NewServerTool(GetSecretScanningAlert(getClient, t)),
 			toolsets.NewServerTool(ListSecretScanningAlerts(getClient, t)),
 		)
-	dependabot := toolsets.NewToolset("dependabot", "Dependabot tools").
+	dependabot := toolsets.NewToolset(string(ToolsetDependabot), "Dependabot tools").
 		AddReadTools(
 			toolsets.NewServerTool(GetDependabotAlert(getClient, t)),
 			toolsets.NewServerTool(ListDependabotAlerts(getClient, t)),
 		)
 
-	notifications := toolsets.NewToolset("notifications", "GitHub Notifications related tools").
+	notifications := toolsets.NewToolset(string(ToolsetNotifications), "GitHub Notifications related tools").
 		AddReadTools(
 			toolsets.NewServerTool(ListNotifications(getClient, t)),
 			toolsets.NewServerTool(GetNotificationDetails(getClient, t)),
@@ -132,7 +156,7 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(ManageRepositoryNotificationSubscription(getClient, t)),
 		)
 
-	discussions := toolsets.NewToolset("discussions", "GitHub Discussions related tools").
+	discussions := toolsets.NewToolset(string(ToolsetDiscussions), "GitHub Discussions related tools").
 		AddReadTools(
 			toolsets.NewServerTool(ListDiscussions(getGQLClient, t)),
 			toolsets.NewServerTool(GetDiscussion(getGQLClient, t)),
@@ -140,7 +164,7 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(ListDiscussionCategories(getGQLClient, t)),
 		)
 
-	actions := toolsets.NewToolset("actions", "GitHub Actions workflows and CI/CD operations").
+	actions := toolsets.NewToolset(string(ToolsetActions), "GitHub Actions workflows and CI/CD operations").
 		AddReadTools(
 			toolsets.NewServerTool(ListWorkflows(getClient, t)),
 			toolsets.NewServerTool(ListWorkflowRuns(getClient, t)),
@@ -160,7 +184,7 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(DeleteWorkflowRunLogs(getClient, t)),
 		)
 
-	securityAdvisories := toolsets.NewToolset("security_advisories", "Security advisories related tools").
+	securityAdvisories := toolsets.NewToolset(string(ToolsetSecurityAdvisories), "Security advisories related tools").
 		AddReadTools(
 			toolsets.NewServerTool(ListGlobalSecurityAdvisories(getClient, t)),
 			toolsets.NewServerTool(GetGlobalSecurityAdvisory(getClient, t)),
@@ -169,16 +193,16 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 		)
 
 	// Keep experiments alive so the system doesn't error out when it's always enabled
-	experiments := toolsets.NewToolset("experiments", "Experimental features that are not considered stable yet")
+	experiments := toolsets.NewToolset(string(ToolsetExperiments), "Experimental features that are not considered stable yet")
 
-	contextTools := toolsets.NewToolset("context", "Tools that provide context about the current user and GitHub context you are operating in").
+	contextTools := toolsets.NewToolset(string(ToolsetContext), "Tools that provide context about the current user and GitHub context you are operating in").
 		AddReadTools(
 			toolsets.NewServerTool(GetMe(getClient, t)),
 			toolsets.NewServerTool(GetTeams(getClient, getGQLClient, t)),
 			toolsets.NewServerTool(GetTeamMembers(getGQLClient, t)),
 		)
 
-	gists := toolsets.NewToolset("gists", "GitHub Gist related tools").
+	gists := toolsets.NewToolset(string(ToolsetGists), "GitHub Gist related tools").
 		AddReadTools(
 			toolsets.NewServerTool(ListGists(getClient, t)),
 		).
@@ -187,12 +211,12 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(UpdateGist(getClient, t)),
 		)
 
-	projects := toolsets.NewToolset("projects", "GitHub Projects related tools").
+	projects := toolsets.NewToolset(string(ToolsetProjects), "GitHub Projects related tools").
 		AddReadTools(
 			toolsets.NewServerTool(ListProjects(getClient, t)),
 		)
 
-	stargazers := toolsets.NewToolset("stargazers", "GitHub Starring related tools").
+	stargazers := toolsets.NewToolset(string(ToolsetStargazers), "GitHub Starring related tools").
 		AddReadTools(toolsets.NewServerTool(ListStarredRepositories(getClient, t))).AddWriteTools(
 		toolsets.NewServerTool(StarRepository(getClient, t)),
 		toolsets.NewServerTool(UnstarRepository(getClient, t)),
@@ -224,7 +248,7 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 func InitDynamicToolset(s *server.MCPServer, tsg *toolsets.ToolsetGroup, t translations.TranslationHelperFunc) *toolsets.Toolset {
 	// Create a new dynamic toolset
 	// Need to add the dynamic toolset last so it can be used to enable other toolsets
-	dynamicToolSelection := toolsets.NewToolset("dynamic", "Discover GitHub MCP tools that can help achieve tasks by enabling additional sets of tools, you can control the enablement of any toolset to access its tools when this toolset is enabled.").
+	dynamicToolSelection := toolsets.NewToolset(string(ToolsetDynamic), "Discover GitHub MCP tools that can help achieve tasks by enabling additional sets of tools, you can control the enablement of any toolset to access its tools when this toolset is enabled.").
 		AddReadTools(
 			toolsets.NewServerTool(ListAvailableToolsets(tsg, t)),
 			toolsets.NewServerTool(GetToolsetsTools(tsg, t)),
