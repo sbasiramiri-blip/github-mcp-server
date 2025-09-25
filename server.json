@@ -61,11 +61,5 @@
         }
       ]
     }
-  ],
-  "remotes": [
-    {
-      "type": "streamable-http",
-      "url": "https://api.githubcopilot.com/mcp/"
-    }
   ]
 }
