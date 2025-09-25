@@ -1,5 +1,5 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2024-11-05/server.schema.json",
   "name": "io.github.github/github-mcp-server",
   "description": "Connect AI assistants to GitHub - manage repos, issues, PRs, and workflows through natural language.",
   "status": "active",
@@ -10,14 +10,15 @@
   "version": "${VERSION}",
   "packages": [
     {
+      "registryType": "oci",
       "registry_type": "oci",
-      "registry_base_url": "https://ghcr.io",
+      "registryBaseUrl": "https://ghcr.io",
       "identifier": "ghcr.io/github/github-mcp-server",
       "version": "${VERSION}",
       "transport": {
         "type": "stdio"
       },
-      "runtime_arguments": [
+      "runtimeArguments": [
         {
           "type": "positional",
           "value": "run",
@@ -40,23 +41,23 @@
         },
         {
           "type": "positional",
-          "value_hint": "env_var_name",
+          "valueHint": "env_var_name",
           "value": "GITHUB_PERSONAL_ACCESS_TOKEN",
           "description": "Environment variable name"
         },
         {
           "type": "positional",
-          "value_hint": "image_name",
+          "valueHint": "image_name",
           "value": "ghcr.io/github/github-mcp-server",
           "description": "The container image to run"
         }
       ],
-      "environment_variables": [
+      "environmentVariables": [
         {
           "description": "Your GitHub personal access token with appropriate scopes.",
-          "is_required": true,
+          "isRequired": true,
           "format": "string",
-          "is_secret": true,
+          "isSecret": true,
           "name": "GITHUB_PERSONAL_ACCESS_TOKEN"
         }
       ]
