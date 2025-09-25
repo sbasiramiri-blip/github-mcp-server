@@ -10,14 +10,14 @@
   "version": "${VERSION}",
   "packages": [
     {
-      "registryType": "oci",
-      "registryBaseUrl": "https://ghcr.io",
+      "registry_type": "oci",
+      "registry_base_url": "https://ghcr.io",
       "identifier": "ghcr.io/github/github-mcp-server",
       "version": "${VERSION}",
       "transport": {
         "type": "stdio"
       },
-      "runtimeArguments": [
+      "runtime_arguments": [
         {
           "type": "positional",
           "value": "run",
@@ -40,23 +40,23 @@
         },
         {
           "type": "positional",
-          "valueHint": "env_var_name",
+          "value_hint": "env_var_name",
           "value": "GITHUB_PERSONAL_ACCESS_TOKEN",
           "description": "Environment variable name"
         },
         {
           "type": "positional",
-          "valueHint": "image_name",
+          "value_hint": "image_name",
           "value": "ghcr.io/github/github-mcp-server",
           "description": "The container image to run"
         }
       ],
-      "environmentVariables": [
+      "environment_variables": [
         {
           "description": "Your GitHub personal access token with appropriate scopes.",
-          "isRequired": true,
+          "is_required": true,
           "format": "string",
-          "isSecret": true,
+          "is_secret": true,
           "name": "GITHUB_PERSONAL_ACCESS_TOKEN"
         }
       ]
