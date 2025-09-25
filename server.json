@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2024-11-05/server.schema.json",
-  "name": "io.github.github/github-mcp-server",
+  "name": "com.github/github-mcp-server",
   "description": "Connect AI assistants to GitHub - manage repos, issues, PRs, and workflows through natural language.",
   "status": "active",
   "repository": {
