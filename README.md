@@ -281,23 +281,23 @@ The following sets of tools are available (all are on by default):
 | `context`               | **Strongly recommended**: Tools that provide context about the current user and GitHub context you are operating in |
 | `actions` | GitHub Actions workflows and CI/CD operations |
 | `code_security` | Code security related tools, such as GitHub Code Scanning |
-| `contents` | Repository contents - get, create, update, delete files and directories |
+| `contents` | Repository contents |
 | `dependabot` | Dependabot tools |
 | `discussions` | GitHub Discussions related tools |
 | `experiments` | Experimental features that are not considered stable yet |
 | `gists` | GitHub Gist related tools |
-| `issues` | GitHub Issues - create, read, update, comment on issues |
+| `issues` | GitHub Issues |
 | `notifications` | GitHub Notifications related tools |
 | `orgs` | GitHub Organization related tools |
 | `projects` | GitHub Projects related tools |
-| `pull_request_reviews` | Pull request review operations - create, submit, manage reviews |
-| `pull_requests` | GitHub Pull Request operations - create, read, update, merge |
-| `releases` | GitHub Repository releases - list, get, and manage releases |
-| `repos` | GitHub Repository management - search, create, fork, branches, commits, tags |
+| `pull_request_reviews` | Pull request review operations |
+| `pull_requests` | GitHub Pull Request operations |
+| `releases` | GitHub Repository releases/tags |
+| `repos` | GitHub Repository management |
 | `secret_protection` | Secret protection related tools, such as GitHub Secret Scanning |
 | `security_advisories` | Security advisories related tools |
 | `stargazers` | GitHub Starring related tools |
-| `sub_issues` | Sub-issue management - create, manage, and organize sub-issues |
+| `sub_issues` | Sub-issue management |
 | `users` | GitHub User related tools |
 <!-- END AUTOMATED TOOLSETS -->
 
@@ -837,7 +837,18 @@ The following sets of tools are available (all are on by default):
   - `repo`: Repository name (string, required)
   - `tag`: Tag name (e.g., 'v1.0.0') (string, required)
 
+- **get_tag** - Get tag details
+  - `owner`: Repository owner (string, required)
+  - `repo`: Repository name (string, required)
+  - `tag`: Tag name (string, required)
+
 - **list_releases** - List releases
+  - `owner`: Repository owner (string, required)
+  - `page`: Page number for pagination (min 1) (number, optional)
+  - `perPage`: Results per page for pagination (min 1, max 100) (number, optional)
+  - `repo`: Repository name (string, required)
+
+- **list_tags** - List tags
   - `owner`: Repository owner (string, required)
   - `page`: Page number for pagination (min 1) (number, optional)
   - `perPage`: Results per page for pagination (min 1, max 100) (number, optional)
@@ -875,11 +886,6 @@ The following sets of tools are available (all are on by default):
   - `repo`: Repository name (string, required)
   - `sha`: Commit SHA, branch name, or tag name (string, required)
 
-- **get_tag** - Get tag details
-  - `owner`: Repository owner (string, required)
-  - `repo`: Repository name (string, required)
-  - `tag`: Tag name (string, required)
-
 - **list_branches** - List branches
   - `owner`: Repository owner (string, required)
   - `page`: Page number for pagination (min 1) (number, optional)
@@ -893,12 +899,6 @@ The following sets of tools are available (all are on by default):
   - `perPage`: Results per page for pagination (min 1, max 100) (number, optional)
   - `repo`: Repository name (string, required)
   - `sha`: Commit SHA, branch or tag name to list commits of. If not provided, uses the default branch of the repository. If a commit SHA is provided, will list commits up to that SHA. (string, optional)
-
-- **list_tags** - List tags
-  - `owner`: Repository owner (string, required)
-  - `page`: Page number for pagination (min 1) (number, optional)
-  - `perPage`: Results per page for pagination (min 1, max 100) (number, optional)
-  - `repo`: Repository name (string, required)
 
 - **search_code** - Search code
   - `order`: Sort order for results (string, optional)

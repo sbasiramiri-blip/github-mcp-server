@@ -42,11 +42,15 @@ const (
 )
 
 // DefaultToolsets contains the default toolsets to enable
-var DefaultToolsets = []Toolset{ToolsetContext, ToolsetRepos, ToolsetIssues, ToolsetPullRequests}
+var DefaultToolsets = []Toolset{ToolsetContext, ToolsetRepos, ToolsetContents, ToolsetPullRequests}
 
 // DefaultTools returns the default toolset names as strings for CLI flags
 func DefaultTools() []string {
-	return []string{string(ToolsetContext), string(ToolsetRepos), string(ToolsetIssues), string(ToolsetPullRequests)}
+	tools := make([]string, len(DefaultToolsets))
+	for i, toolset := range DefaultToolsets {
+		tools[i] = string(toolset)
+	}
+	return tools
 }
 
 func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetGQLClientFn, getRawClient raw.GetRawClientFn, t translations.TranslationHelperFunc, contentWindowSize int) *toolsets.ToolsetGroup {
@@ -54,15 +58,13 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 
 	// Define all available features with their default state (disabled)
 	// Create toolsets
-	repos := toolsets.NewToolset(string(ToolsetRepos), "GitHub Repository management - search, create, fork, branches, commits, tags").
+	repos := toolsets.NewToolset(string(ToolsetRepos), "GitHub Repository management").
 		AddReadTools(
 			toolsets.NewServerTool(SearchRepositories(getClient, t)),
 			toolsets.NewServerTool(ListCommits(getClient, t)),
 			toolsets.NewServerTool(SearchCode(getClient, t)),
 			toolsets.NewServerTool(GetCommit(getClient, t)),
 			toolsets.NewServerTool(ListBranches(getClient, t)),
-			toolsets.NewServerTool(ListTags(getClient, t)),
-			toolsets.NewServerTool(GetTag(getClient, t)),
 		).
 		AddWriteTools(
 			toolsets.NewServerTool(CreateRepository(getClient, t)),
@@ -70,7 +72,7 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(CreateBranch(getClient, t)),
 		)
 
-	contents := toolsets.NewToolset(string(ToolsetContents), "Repository contents - get, create, update, delete files and directories").
+	contents := toolsets.NewToolset(string(ToolsetContents), "Repository contents").
 		AddReadTools(
 			toolsets.NewServerTool(GetFileContents(getClient, getRawClient, t)),
 		).
@@ -87,14 +89,16 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerResourceTemplate(GetRepositoryResourcePrContent(getClient, getRawClient, t)),
 		)
 
-	releases := toolsets.NewToolset(string(ToolsetReleases), "GitHub Repository releases - list, get, and manage releases").
+	releases := toolsets.NewToolset(string(ToolsetReleases), "GitHub Repository releases/tags").
 		AddReadTools(
 			toolsets.NewServerTool(ListReleases(getClient, t)),
 			toolsets.NewServerTool(GetLatestRelease(getClient, t)),
 			toolsets.NewServerTool(GetReleaseByTag(getClient, t)),
+			toolsets.NewServerTool(ListTags(getClient, t)),
+			toolsets.NewServerTool(GetTag(getClient, t)),
 		)
 
-	issues := toolsets.NewToolset(string(ToolsetIssues), "GitHub Issues - create, read, update, comment on issues").
+	issues := toolsets.NewToolset(string(ToolsetIssues), "GitHub Issues").
 		AddReadTools(
 			toolsets.NewServerTool(GetIssue(getClient, t)),
 			toolsets.NewServerTool(SearchIssues(getClient, t)),
@@ -112,7 +116,7 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 		toolsets.NewServerPrompt(IssueToFixWorkflowPrompt(t)),
 	)
 
-	subIssues := toolsets.NewToolset(string(ToolsetSubIssues), "Sub-issue management - create, manage, and organize sub-issues").
+	subIssues := toolsets.NewToolset(string(ToolsetSubIssues), "Sub-issue management").
 		AddReadTools(
 			toolsets.NewServerTool(ListSubIssues(getClient, t)),
 		).
@@ -129,7 +133,7 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 		AddReadTools(
 			toolsets.NewServerTool(SearchOrgs(getClient, t)),
 		)
-	pullRequests := toolsets.NewToolset(string(ToolsetPullRequests), "GitHub Pull Request operations - create, read, update, merge").
+	pullRequests := toolsets.NewToolset(string(ToolsetPullRequests), "GitHub Pull Request operations").
 		AddReadTools(
 			toolsets.NewServerTool(GetPullRequest(getClient, t)),
 			toolsets.NewServerTool(ListPullRequests(getClient, t)),
@@ -145,7 +149,7 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(UpdatePullRequestBranch(getClient, t)),
 		)
 
-	pullRequestReviews := toolsets.NewToolset(string(ToolsetPullRequestReviews), "Pull request review operations - create, submit, manage reviews").
+	pullRequestReviews := toolsets.NewToolset(string(ToolsetPullRequestReviews), "Pull request review operations").
 		AddReadTools(
 			toolsets.NewServerTool(GetPullRequestReviewComments(getClient, t)),
 			toolsets.NewServerTool(GetPullRequestReviews(getClient, t)),
