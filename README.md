@@ -1113,6 +1113,12 @@ The following sets of tools are available (all are on by default):
 
 #### Specifying Toolsets
 
+The default configuration of enabled toolsets is:
+- context
+- content
+- repos
+- pull_requests
+
 To specify toolsets you want available to the LLM, you can pass an allow-list in two ways:
 
 1. **Using Command Line Argument**:
