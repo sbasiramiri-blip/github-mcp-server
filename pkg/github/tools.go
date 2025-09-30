@@ -2,6 +2,8 @@ package github
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/github/github-mcp-server/pkg/raw"
 	"github.com/github/github-mcp-server/pkg/toolsets"
@@ -74,6 +76,14 @@ var AvailableToolsets = []Toolset{
 func DefaultTools() []string {
 	tools := make([]string, len(DefaultToolsets))
 	for i, toolset := range DefaultToolsets {
+		tools[i] = string(toolset)
+	}
+	return tools
+}
+
+func AvailableTools() []string {
+	tools := make([]string, len(AvailableToolsets))
+	for i, toolset := range AvailableToolsets {
 		tools[i] = string(toolset)
 	}
 	return tools
@@ -335,4 +345,38 @@ func ToStringPtr(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// GenerateToolsetsHelp generates the help text for the toolsets flag
+func GenerateToolsetsHelp() string {
+	// Format default tools
+	defaultTools := strings.Join(DefaultTools(), ", ")
+
+	// Format available tools with line breaks for better readability
+	allTools := AvailableTools()
+	var availableToolsLines []string
+	const maxLineLength = 70
+	currentLine := ""
+
+	for i, tool := range allTools {
+		if i == 0 {
+			currentLine = tool
+		} else if len(currentLine)+len(tool)+2 <= maxLineLength {
+			currentLine += ", " + tool
+		} else {
+			availableToolsLines = append(availableToolsLines, currentLine)
+			currentLine = tool
+		}
+	}
+	if currentLine != "" {
+		availableToolsLines = append(availableToolsLines, currentLine)
+	}
+
+	availableTools := strings.Join(availableToolsLines, ",\n\t     ")
+
+	toolsetsHelp := fmt.Sprintf("Comma-separated list of tool groups to enable (no spaces).\n"+
+		"Default: %s\n"+
+		"To enable all tools, use all\n"+
+		"Available: %s", defaultTools, availableTools)
+	return toolsetsHelp
 }
