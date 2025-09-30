@@ -44,6 +44,32 @@ const (
 // DefaultToolsets contains the default toolsets to enable
 var DefaultToolsets = []Toolset{ToolsetContext, ToolsetRepos, ToolsetContents, ToolsetPullRequests}
 
+// AvailableToolsets contains all available toolsets
+var AvailableToolsets = []Toolset{
+	ToolsetContext,
+	ToolsetRepos,
+	ToolsetContents,
+	ToolsetReleases,
+	ToolsetIssues,
+	ToolsetSubIssues,
+	ToolsetUsers,
+	ToolsetOrgs,
+	ToolsetPullRequests,
+	ToolsetPullRequestReviews,
+	ToolsetCodeSecurity,
+	ToolsetSecretProtection,
+	ToolsetDependabot,
+	ToolsetNotifications,
+	ToolsetDiscussions,
+	ToolsetActions,
+	ToolsetSecurityAdvisories,
+	ToolsetExperiments,
+	ToolsetGists,
+	ToolsetProjects,
+	ToolsetStargazers,
+	ToolsetDynamic,
+}
+
 // DefaultTools returns the default toolset names as strings for CLI flags
 func DefaultTools() []string {
 	tools := make([]string, len(DefaultToolsets))
