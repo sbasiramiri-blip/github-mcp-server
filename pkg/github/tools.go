@@ -44,7 +44,7 @@ const (
 )
 
 // DefaultToolsets contains the default toolsets to enable
-var DefaultToolsets = []Toolset{ToolsetContext, ToolsetUsers, ToolsetRepos, ToolsetContents, ToolsetPullRequests, ToolsetIssues}
+var DefaultToolsets = []Toolset{ToolsetContext, ToolsetUsers, ToolsetRepos, ToolsetContents, ToolsetPullRequests}
 
 // AvailableToolsets contains all available toolsets
 var AvailableToolsets = []Toolset{

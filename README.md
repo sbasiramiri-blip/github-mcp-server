@@ -1114,7 +1114,7 @@ The following sets of tools are available (all are on by default):
 #### Specifying Toolsets
 
 The default configuration of enabled toolsets is:
-- context
+- context(should be part of every configuration)
 - users
 - content
 - repos
