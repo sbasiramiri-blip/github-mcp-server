@@ -38,6 +38,8 @@ type MCPServerConfig struct {
 	// See: https://github.com/github/github-mcp-server?tab=readme-ov-file#tool-configuration
 	EnabledToolsets []string
 
+	EnabledTools []string
+
 	// Whether to enable dynamic toolsets
 	// See: https://github.com/github/github-mcp-server?tab=readme-ov-file#dynamic-tool-discovery
 	DynamicToolsets bool
@@ -141,11 +143,61 @@ func NewMCPServer(cfg MCPServerConfig) (*server.MCPServer, error) {
 	}
 
 	// Create default toolsets
-	tsg := github.DefaultToolsetGroup(cfg.ReadOnly, getClient, getGQLClient, getRawClient, cfg.Translator, cfg.ContentWindowSize)
-	err = tsg.EnableToolsets(enabledToolsets)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to enable toolsets: %w", err)
+    tsg := github.DefaultToolsetGroup(cfg.ReadOnly, getClient, getGQLClient, getRawClient, cfg.Translator, cfg.ContentWindowSize)
+    
+    // When tools are specified, we enable only those tools
+    if len(cfg.EnabledTools) > 0 {
+        fmt.Fprintf(os.Stderr, "DEBUG: Specific tools mode activated with tools: %v\n", cfg.EnabledTools)
+        
+        // Build a map of tool name -> toolset name
+        toolToToolsetMap := make(map[string]string)
+        for toolsetName, toolset := range tsg.Toolsets {
+            for _, tool := range toolset.GetAvailableTools() {
+                toolToToolsetMap[tool.Tool.Name] = toolsetName
+            }
+        }
+        
+        fmt.Fprintf(os.Stderr, "DEBUG: Built tool map with %d tools\n", len(toolToToolsetMap))
+        
+        // Determine which toolsets need to be enabled based on requested tools
+        toolsetToToolsMap := make(map[string][]string)
+        for _, toolName := range cfg.EnabledTools {
+            if toolsetName, ok := toolToToolsetMap[toolName]; ok {
+                toolsetToToolsMap[toolsetName] = append(toolsetToToolsMap[toolsetName], toolName)
+                fmt.Fprintf(os.Stderr, "DEBUG: Tool '%s' belongs to toolset '%s'\n", toolName, toolsetName)
+            } else {
+                fmt.Fprintf(os.Stderr, "DEBUG: WARNING - Tool '%s' not found in any toolset!\n", toolName)
+            }
+        }
+        
+        // Enable the required toolsets
+        requiredToolsets := make([]string, 0, len(toolsetToToolsMap))
+        for toolsetName := range toolsetToToolsMap {
+            requiredToolsets = append(requiredToolsets, toolsetName)
+        }
+        
+        fmt.Fprintf(os.Stderr, "DEBUG: Enabling %d toolsets: %v\n", len(requiredToolsets), requiredToolsets)
+        
+        err = tsg.EnableToolsets(requiredToolsets)
+        if err != nil {
+            return nil, fmt.Errorf("failed to enable toolsets: %w", err)
+        }
+        
+        // Enable only specific tools in each toolset
+        for toolsetName, toolNames := range toolsetToToolsMap {
+            toolset, err := tsg.GetToolset(toolsetName)
+            if err != nil {
+                return nil, fmt.Errorf("failed to get toolset %s: %w", toolsetName, err)
+            }
+            fmt.Fprintf(os.Stderr, "DEBUG: Enabling specific tools %v for toolset '%s'\n", toolNames, toolsetName)
+            toolset.EnableSpecificTools(toolNames)
+        }
+    } else {
+		// Normal toolset mode - enable requested toolsets (or all by default)
+		err = tsg.EnableToolsets(enabledToolsets)
+		if err != nil {
+			return nil, fmt.Errorf("failed to enable toolsets: %w", err)
+		}
 	}
 
 	// Register all mcp functionality with the server
@@ -172,6 +224,8 @@ type StdioServerConfig struct {
 	// EnabledToolsets is a list of toolsets to enable
 	// See: https://github.com/github/github-mcp-server?tab=readme-ov-file#tool-configuration
 	EnabledToolsets []string
+
+	EnabledTools []string
 
 	// Whether to enable dynamic toolsets
 	// See: https://github.com/github/github-mcp-server?tab=readme-ov-file#dynamic-tool-discovery
@@ -207,6 +261,7 @@ func RunStdioServer(cfg StdioServerConfig) error {
 		Host:              cfg.Host,
 		Token:             cfg.Token,
 		EnabledToolsets:   cfg.EnabledToolsets,
+		EnabledTools:      cfg.EnabledTools,
 		DynamicToolsets:   cfg.DynamicToolsets,
 		ReadOnly:          cfg.ReadOnly,
 		Translator:        t,

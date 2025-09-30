@@ -2,6 +2,7 @@ package toolsets
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -60,6 +61,16 @@ type Toolset struct {
 	resourceTemplates []server.ServerResourceTemplate
 	// prompts are also not tools but are namespaced similarly
 	prompts []server.ServerPrompt
+	enabledTools map[string]bool
+}
+
+func (t *Toolset) EnableSpecificTools(toolNames []string) {
+	if t.enabledTools == nil {
+		t.enabledTools = make(map[string]bool)
+	}
+	for _, name := range toolNames {
+		t.enabledTools[name] = true
+	}
 }
 
 func (t *Toolset) GetActiveTools() []server.ServerTool {
@@ -80,17 +91,37 @@ func (t *Toolset) GetAvailableTools() []server.ServerTool {
 }
 
 func (t *Toolset) RegisterTools(s *server.MCPServer) {
-	if !t.Enabled {
-		return
-	}
-	for _, tool := range t.readTools {
-		s.AddTool(tool.Tool, tool.Handler)
-	}
-	if !t.readOnly {
-		for _, tool := range t.writeTools {
-			s.AddTool(tool.Tool, tool.Handler)
-		}
-	}
+    if !t.Enabled {
+        fmt.Fprintf(os.Stderr, "DEBUG RegisterTools: Toolset '%s' is not enabled, skipping\n", t.Name)
+        return
+    }
+    fmt.Fprintf(os.Stderr, "DEBUG RegisterTools: Toolset '%s' is enabled, enabledTools=%v\n", t.Name, t.enabledTools)
+    for _, tool := range t.readTools {
+        // Check if granular control is active
+        if t.enabledTools != nil {
+            // In selective mode, only register if tool is explicitly enabled
+            if enabled, exists := t.enabledTools[tool.Tool.Name]; !exists || !enabled {
+                fmt.Fprintf(os.Stderr, "DEBUG RegisterTools: Skipping read tool '%s' (exists=%v, enabled=%v)\n", tool.Tool.Name, exists, enabled)
+                continue // Skip this tool
+            }
+        }
+        fmt.Fprintf(os.Stderr, "DEBUG RegisterTools: Registering read tool '%s'\n", tool.Tool.Name)
+        s.AddTool(tool.Tool, tool.Handler)
+    }
+    if !t.readOnly {
+        for _, tool := range t.writeTools {
+            // Same check for write tools
+            if t.enabledTools != nil {
+                // In selective mode, only register if tool is explicitly enabled
+                if enabled, exists := t.enabledTools[tool.Tool.Name]; !exists || !enabled {
+                    fmt.Fprintf(os.Stderr, "DEBUG RegisterTools: Skipping write tool '%s' (exists=%v, enabled=%v)\n", tool.Tool.Name, exists, enabled)
+                    continue
+                }
+            }
+            fmt.Fprintf(os.Stderr, "DEBUG RegisterTools: Registering write tool '%s'\n", tool.Tool.Name)
+            s.AddTool(tool.Tool, tool.Handler)
+        }
+    }
 }
 
 func (t *Toolset) AddResourceTemplates(templates ...server.ServerResourceTemplate) *Toolset {
