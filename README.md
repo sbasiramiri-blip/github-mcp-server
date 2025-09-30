@@ -1115,6 +1115,7 @@ The following sets of tools are available (all are on by default):
 
 The default configuration of enabled toolsets is:
 - context
+- users
 - content
 - repos
 - pull_requests
