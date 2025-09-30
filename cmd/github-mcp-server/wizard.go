@@ -6,7 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/github/github-mcp-server/pkg/github"
 	"github.com/github/github-mcp-server/pkg/raw"
 	gogithub "github.com/google/go-github/v74/github"
@@ -21,6 +22,61 @@ var wizardCmd = &cobra.Command{
 	RunE:  runWizard,
 }
 
+// Styles for the wizard UI
+var (
+	titleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#7D56F4")).
+			MarginBottom(1).
+			MarginTop(1)
+
+	subtitleStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#888888")).
+			MarginBottom(1)
+
+	selectedItemStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FFFFFF")).
+				Background(lipgloss.Color("#7D56F4")).
+				Bold(true).
+				PaddingLeft(1).
+				PaddingRight(1)
+
+	itemStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFFFFF")).
+			PaddingLeft(1)
+
+	selectedCheckStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#00FF00")).
+				Bold(true)
+
+	unselectedCheckStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#888888"))
+
+	categoryStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFA500")).
+			Bold(true).
+			MarginTop(1)
+
+	helpStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#888888")).
+			MarginTop(1)
+
+	filterStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#7D56F4")).
+			Bold(true)
+
+	dimStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666"))
+
+	successStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00FF00")).
+			Bold(true)
+
+	errorStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FF0000")).
+			Bold(true)
+)
+
 type toolInfo struct {
 	name        string
 	description string
@@ -32,6 +88,394 @@ type toolsetInfo struct {
 	name        string
 	description string
 	tools       []toolInfo
+}
+
+type wizardModel struct {
+	toolsets       []toolsetInfo
+	allTools       []toolInfo
+	filteredTools  []toolInfo
+	cursor         int
+	selected       map[int]bool
+	filter         string
+	filterActive   bool
+	width          int
+	height         int
+	quitting       bool
+	confirmed      bool
+	viewportOffset int
+}
+
+func initialWizardModel(toolsets []toolsetInfo) wizardModel {
+	// Flatten all tools
+	var allTools []toolInfo
+	for _, ts := range toolsets {
+		for _, tool := range ts.tools {
+			allTools = append(allTools, tool)
+		}
+	}
+
+	return wizardModel{
+		toolsets:      toolsets,
+		allTools:      allTools,
+		filteredTools: allTools,
+		selected:      make(map[int]bool),
+		width:         80,
+		height:        24,
+	}
+}
+
+func (m wizardModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m wizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			if m.filterActive {
+				// Exit filter mode
+				m.filterActive = false
+				m.filter = ""
+				m.filteredTools = m.allTools
+				m.cursor = 0
+				m.viewportOffset = 0
+				return m, nil
+			}
+			m.quitting = true
+			return m, tea.Quit
+
+		case "enter":
+			if m.filterActive {
+				// Exit filter mode
+				m.filterActive = false
+				return m, nil
+			}
+			// Confirm selection
+			m.confirmed = true
+			return m, tea.Quit
+
+		case "/":
+			if !m.filterActive {
+				m.filterActive = true
+				m.filter = ""
+				return m, nil
+			}
+
+		case "backspace":
+			if m.filterActive && len(m.filter) > 0 {
+				m.filter = m.filter[:len(m.filter)-1]
+				m.applyFilter()
+				return m, nil
+			}
+
+		case "esc":
+			if m.filterActive {
+				m.filterActive = false
+				m.filter = ""
+				m.filteredTools = m.allTools
+				m.cursor = 0
+				m.viewportOffset = 0
+				return m, nil
+			}
+
+		case "up", "k":
+			if !m.filterActive && m.cursor > 0 {
+				m.cursor--
+				m.adjustViewport()
+			}
+
+		case "down", "j":
+			if !m.filterActive && m.cursor < len(m.filteredTools)-1 {
+				m.cursor++
+				m.adjustViewport()
+			}
+
+		case "g":
+			if !m.filterActive {
+				m.cursor = 0
+				m.viewportOffset = 0
+			}
+
+		case "G":
+			if !m.filterActive {
+				m.cursor = len(m.filteredTools) - 1
+				m.adjustViewport()
+			}
+
+		case " ", "x":
+			if !m.filterActive && len(m.filteredTools) > 0 {
+				// Toggle selection
+				m.selected[m.cursor] = !m.selected[m.cursor]
+			}
+
+		case "a":
+			if !m.filterActive {
+				// Select all filtered
+				for i := range m.filteredTools {
+					m.selected[i] = true
+				}
+			}
+
+		case "n":
+			if !m.filterActive {
+				// Deselect all
+				m.selected = make(map[int]bool)
+			}
+
+		default:
+			if m.filterActive && len(msg.String()) == 1 {
+				m.filter += msg.String()
+				m.applyFilter()
+			}
+		}
+	}
+
+	return m, nil
+}
+
+func (m *wizardModel) applyFilter() {
+	if m.filter == "" {
+		m.filteredTools = m.allTools
+	} else {
+		m.filteredTools = []toolInfo{}
+		filterLower := strings.ToLower(m.filter)
+		for _, tool := range m.allTools {
+			if strings.Contains(strings.ToLower(tool.name), filterLower) ||
+				strings.Contains(strings.ToLower(tool.description), filterLower) ||
+				strings.Contains(strings.ToLower(tool.toolsetName), filterLower) {
+				m.filteredTools = append(m.filteredTools, tool)
+			}
+		}
+	}
+	m.cursor = 0
+	m.viewportOffset = 0
+}
+
+func (m *wizardModel) adjustViewport() {
+	maxVisible := m.height - 10 // Reserve space for header and footer
+	if maxVisible < 1 {
+		maxVisible = 10
+	}
+
+	if m.cursor < m.viewportOffset {
+		m.viewportOffset = m.cursor
+	} else if m.cursor >= m.viewportOffset+maxVisible {
+		m.viewportOffset = m.cursor - maxVisible + 1
+	}
+}
+
+func (m wizardModel) View() string {
+	if m.quitting && !m.confirmed {
+		return dimStyle.Render("\nConfiguration cancelled.\n")
+	}
+
+	if m.confirmed {
+		return m.renderConfirmation()
+	}
+
+	var s strings.Builder
+
+	// Header
+	s.WriteString(titleStyle.Render("🧙 GitHub MCP Server Configuration Wizard"))
+	s.WriteString("\n")
+	s.WriteString(subtitleStyle.Render("Select the tools you want to enable for your MCP server"))
+	s.WriteString("\n")
+
+	// Filter bar
+	if m.filterActive {
+		s.WriteString(filterStyle.Render("Filter: ") + m.filter + "█")
+		s.WriteString("\n")
+	} else if m.filter != "" {
+		s.WriteString(filterStyle.Render(fmt.Sprintf("Filtered: %d/%d tools", len(m.filteredTools), len(m.allTools))))
+		s.WriteString("\n")
+	}
+	s.WriteString("\n")
+
+	// Tool list
+	maxVisible := m.height - 10
+	if maxVisible < 1 {
+		maxVisible = 10
+	}
+
+	visibleStart := m.viewportOffset
+	visibleEnd := visibleStart + maxVisible
+	if visibleEnd > len(m.filteredTools) {
+		visibleEnd = len(m.filteredTools)
+	}
+
+	selectedCount := 0
+	for _, selected := range m.selected {
+		if selected {
+			selectedCount++
+		}
+	}
+
+	if len(m.filteredTools) == 0 {
+		s.WriteString(dimStyle.Render("  No tools match your filter\n"))
+	} else {
+		for i := visibleStart; i < visibleEnd; i++ {
+			tool := m.filteredTools[i]
+
+			// Check if selected
+			checkbox := "[ ]"
+			checkStyle := unselectedCheckStyle
+			if m.selected[i] {
+				checkbox = "[✓]"
+				checkStyle = selectedCheckStyle
+			}
+
+			// Render cursor
+			cursor := "  "
+			nameStyle := itemStyle
+			if i == m.cursor && !m.filterActive {
+				cursor = "▸ "
+				nameStyle = selectedItemStyle
+			}
+
+			// Format the line
+			line := fmt.Sprintf("%s%s %s ",
+				cursor,
+				checkStyle.Render(checkbox),
+				nameStyle.Render(tool.name),
+			)
+
+			// Add category badge
+			category := dimStyle.Render(fmt.Sprintf("[%s]", tool.toolsetName))
+			line += category
+
+			// Add description (truncated if needed)
+			desc := getFirstSentence(tool.description)
+			if len(desc) > 60 {
+				desc = desc[:57] + "..."
+			}
+			line += " " + dimStyle.Render(desc)
+
+			s.WriteString(line)
+			s.WriteString("\n")
+		}
+
+		// Scroll indicator
+		if len(m.filteredTools) > maxVisible {
+			scrollInfo := fmt.Sprintf("  (showing %d-%d of %d)",
+				visibleStart+1, visibleEnd, len(m.filteredTools))
+			s.WriteString(dimStyle.Render(scrollInfo))
+			s.WriteString("\n")
+		}
+	}
+
+	s.WriteString("\n")
+
+	// Footer with help
+	s.WriteString(helpStyle.Render(fmt.Sprintf("Selected: %d tools", selectedCount)))
+	s.WriteString("\n")
+	s.WriteString(helpStyle.Render("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"))
+	s.WriteString("\n")
+
+	if m.filterActive {
+		s.WriteString(helpStyle.Render("esc: exit filter • backspace: delete character • enter: apply filter"))
+	} else {
+		s.WriteString(helpStyle.Render("↑/↓ or j/k: navigate • space: toggle • /: filter • a: select all • n: clear all"))
+		s.WriteString("\n")
+		s.WriteString(helpStyle.Render("g: top • G: bottom • enter: confirm • q: quit"))
+	}
+
+	return s.String()
+}
+
+func (m wizardModel) renderConfirmation() string {
+	var s strings.Builder
+
+	// Get selected tools
+	var selectedTools []string
+	for i, selected := range m.selected {
+		if selected && i < len(m.filteredTools) {
+			selectedTools = append(selectedTools, m.filteredTools[i].name)
+		}
+	}
+
+	// Sort for consistent output
+	sort.Strings(selectedTools)
+
+	s.WriteString("\n")
+	s.WriteString(successStyle.Render("✅ Configuration Complete!"))
+	s.WriteString("\n\n")
+	s.WriteString(titleStyle.Render("Selected Tools:"))
+	s.WriteString("\n")
+
+	if len(selectedTools) == 0 {
+		s.WriteString(dimStyle.Render("  (none - all tools will be enabled by default)"))
+		s.WriteString("\n")
+	} else {
+		// Group by toolset
+		toolsBySet := make(map[string][]string)
+		for i, selected := range m.selected {
+			if selected && i < len(m.filteredTools) {
+				tool := m.filteredTools[i]
+				toolsBySet[tool.toolsetName] = append(toolsBySet[tool.toolsetName], tool.name)
+			}
+		}
+
+		// Get sorted toolset names
+		var toolsetNames []string
+		for name := range toolsBySet {
+			toolsetNames = append(toolsetNames, name)
+		}
+		sort.Strings(toolsetNames)
+
+		for _, tsName := range toolsetNames {
+			s.WriteString("\n")
+			s.WriteString(categoryStyle.Render("  " + tsName + ":"))
+			s.WriteString("\n")
+			for _, toolName := range toolsBySet[tsName] {
+				s.WriteString(itemStyle.Render("    • " + toolName))
+				s.WriteString("\n")
+			}
+		}
+	}
+
+	// Build command args
+	cmdArgs := []string{
+		"run",
+		"cmd/github-mcp-server/main.go",
+		"cmd/github-mcp-server/wizard.go",
+		"stdio",
+	}
+
+	if len(selectedTools) > 0 {
+		cmdArgs = append(cmdArgs, "--tools")
+		cmdArgs = append(cmdArgs, strings.Join(selectedTools, ","))
+	}
+
+	s.WriteString("\n")
+	s.WriteString(titleStyle.Render("Configuration for mcp.json:"))
+	s.WriteString("\n\n")
+
+	// Print JSON format
+	s.WriteString(dimStyle.Render(`"args": [`))
+	s.WriteString("\n")
+	for i, arg := range cmdArgs {
+		comma := ","
+		if i == len(cmdArgs)-1 {
+			comma = ""
+		}
+		s.WriteString(dimStyle.Render(fmt.Sprintf(`    "%s"%s`, arg, comma)))
+		s.WriteString("\n")
+	}
+	s.WriteString(dimStyle.Render(`],`))
+	s.WriteString("\n\n")
+
+	s.WriteString(titleStyle.Render("Or run directly with:"))
+	s.WriteString("\n")
+	s.WriteString(successStyle.Render(fmt.Sprintf("go %s", strings.Join(cmdArgs, " "))))
+	s.WriteString("\n\n")
+
+	return s.String()
 }
 
 // getAvailableToolsets dynamically extracts toolsets and their tools from the server
@@ -107,86 +551,18 @@ func getFirstSentence(description string) string {
 
 
 func runWizard(cmd *cobra.Command, args []string) error {
-    fmt.Println("🧙 GitHub MCP Server Configuration Wizard")
-    fmt.Println("==========================================")
-    fmt.Println()
+	// Dynamically get available toolsets
+	toolsets := getAvailableToolsets()
 
-    // Dynamically get available toolsets
-    toolsets := getAvailableToolsets()
-    
-    // Flatten all tools into a single list
-    var allToolOptions []string
-    toolMap := make(map[string]toolInfo)
-    
-    for _, ts := range toolsets {
-        for _, tool := range ts.tools {
-            // Use only the first sentence of the description
-            shortDesc := getFirstSentence(tool.description)
-            option := fmt.Sprintf("%s%s (from %s)", tool.name, shortDesc, tool.toolsetName)
-            allToolOptions = append(allToolOptions, option)
-            toolMap[option] = tool
-        }
-    }
-    
-    // Present a simple multi-select list
-    var selectedOptions []string
-    toolPrompt := &survey.MultiSelect{
-        Message:  "Select the tools you want to enable (type to filter, use arrows/space to select):",
-        Options:  allToolOptions,
-        PageSize: 15,
-        VimMode:  true,
-    }
-    
-    if err := survey.AskOne(toolPrompt, &selectedOptions); err != nil {
-        return err
-    }
-    
-    // Extract selected tool names
-    var selectedTools []string
-    for _, selection := range selectedOptions {
-        if tool, exists := toolMap[selection]; exists {
-            selectedTools = append(selectedTools, tool.name)
-        }
-    }
+	// Create and run the Bubble Tea program
+	p := tea.NewProgram(
+		initialWizardModel(toolsets),
+		tea.WithAltScreen(),
+	)
 
-    // Build args array
-    cmdArgs := []string{
-        "run",
-        "cmd/github-mcp-server/main.go",
-        "cmd/github-mcp-server/wizard.go",
-        "stdio",
-    }
+	if _, err := p.Run(); err != nil {
+		return fmt.Errorf("error running wizard: %w", err)
+	}
 
-    // Add specific tools
-    if len(selectedTools) > 0 {
-        cmdArgs = append(cmdArgs, "--tools")
-        cmdArgs = append(cmdArgs, strings.Join(selectedTools, ","))
-    }
-
-    // Display the command
-    fmt.Println()
-    fmt.Println("✅ Configuration Complete!")
-    fmt.Println("==========================")
-    fmt.Println()
-    fmt.Println("Selected tools:", strings.Join(selectedTools, ", "))
-    fmt.Println()
-    fmt.Println("Add this to your mcp.json configuration:")
-    fmt.Println()
-
-    // Print JSON format
-    fmt.Println(`"args": [`)
-    for i, arg := range cmdArgs {
-        comma := ","
-        if i == len(cmdArgs)-1 {
-            comma = ""
-        }
-        fmt.Printf(`    "%s"%s`+"\n", arg, comma)
-    }
-    fmt.Println(`],`)
-
-    fmt.Println()
-    fmt.Println("Or run directly with:")
-    fmt.Printf("go %s\n", strings.Join(cmdArgs, " "))
-
-    return nil
+	return nil
 }
