@@ -755,7 +755,7 @@ func GetRepositoryTree(getClient GetClientFn, t translations.TranslationHelperFu
 			var filteredEntries []*github.TreeEntry
 			if pathFilter != "" {
 				for _, entry := range tree.Entries {
-					if entry.Path != nil && strings.HasPrefix(*entry.Path, pathFilter) {
+					if strings.HasPrefix(entry.GetPath(), pathFilter) {
 						filteredEntries = append(filteredEntries, entry)
 					}
 				}
@@ -763,7 +763,6 @@ func GetRepositoryTree(getClient GetClientFn, t translations.TranslationHelperFu
 				filteredEntries = tree.Entries
 			}
 
-			// Create a simplified response structure
 			type TreeEntryResponse struct {
 				Path string `json:"path"`
 				Type string `json:"type"`
@@ -787,11 +786,11 @@ func GetRepositoryTree(getClient GetClientFn, t translations.TranslationHelperFu
 			treeEntries := make([]TreeEntryResponse, len(filteredEntries))
 			for i, entry := range filteredEntries {
 				treeEntries[i] = TreeEntryResponse{
-					Path: *entry.Path,
-					Type: *entry.Type,
-					Mode: *entry.Mode,
-					SHA:  *entry.SHA,
-					URL:  *entry.URL,
+					Path: entry.GetPath(),
+					Type: entry.GetType(),
+					Mode: entry.GetMode(),
+					SHA:  entry.GetSHA(),
+					URL:  entry.GetURL(),
 				}
 				if entry.Size != nil {
 					treeEntries[i].Size = entry.Size
