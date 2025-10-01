@@ -75,7 +75,31 @@ var (
 	errorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FF0000")).
 			Bold(true)
+
+	asciiArtStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#7D56F4")).
+			Bold(true)
+
+	welcomeTextStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FFFFFF")).
+				MarginTop(1).
+				MarginBottom(1)
+
+	accentStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00D7FF")).
+			Bold(true)
 )
+
+const asciiArt = `
+   _____ _ _   _    _       _       __  __  _____ _____  
+  / ____(_) | | |  | |     | |     |  \/  |/ ____|  __ \ 
+ | |  __ _| |_| |__| |_   _| |__   | \  / | |    | |__) |
+ | | |_ | | __|  __  | | | | '_ \  | |\/| | |    |  ___/ 
+ | |__| | | |_| |  | | |_| | |_) | | |  | | |____| |     
+  \_____|_|\__|_|  |_|\__,_|_.__/  |_|  |_|\_____|_|     
+                                                          
+           🧙  Configuration Wizard  🔧                    
+`
 
 type toolInfo struct {
 	name        string
@@ -103,15 +127,14 @@ type wizardModel struct {
 	quitting       bool
 	confirmed      bool
 	viewportOffset int
+	showWelcome    bool
 }
 
 func initialWizardModel(toolsets []toolsetInfo) wizardModel {
 	// Flatten all tools
 	var allTools []toolInfo
 	for _, ts := range toolsets {
-		for _, tool := range ts.tools {
-			allTools = append(allTools, tool)
-		}
+		allTools = append(allTools, ts.tools...)
 	}
 
 	return wizardModel{
@@ -121,6 +144,7 @@ func initialWizardModel(toolsets []toolsetInfo) wizardModel {
 		selected:      make(map[int]bool),
 		width:         80,
 		height:        24,
+		showWelcome:   true, // Start with welcome screen
 	}
 }
 
@@ -136,6 +160,20 @@ func (m wizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// Welcome screen - only Enter or Space continues
+		if m.showWelcome {
+			switch msg.String() {
+			case "ctrl+c", "q", "esc":
+				m.quitting = true
+				return m, tea.Quit
+			case "enter", " ":
+				m.showWelcome = false
+				return m, nil
+			}
+			// Ignore all other keys on welcome screen
+			return m, nil
+		}
+
 		switch msg.String() {
 		case "ctrl+c", "q":
 			if m.filterActive {
@@ -276,7 +314,13 @@ func (m wizardModel) View() string {
 	}
 
 	if m.confirmed {
-		return m.renderConfirmation()
+		// Show a brief "saving" message before exiting
+		return successStyle.Render("\n✓ Generating configuration...\n")
+	}
+
+	// Show welcome screen first
+	if m.showWelcome {
+		return m.renderWelcome()
 	}
 
 	var s strings.Builder
@@ -388,6 +432,90 @@ func (m wizardModel) View() string {
 	return s.String()
 }
 
+func (m wizardModel) renderWelcome() string {
+	var s strings.Builder
+
+	// Center the content vertically
+	totalLines := strings.Count(asciiArt, "\n") + 20 // ASCII art + text
+	topPadding := (m.height - totalLines) / 2
+	if topPadding < 0 {
+		topPadding = 0
+	}
+
+	for i := 0; i < topPadding; i++ {
+		s.WriteString("\n")
+	}
+
+	// ASCII art
+	s.WriteString(asciiArtStyle.Render(asciiArt))
+	s.WriteString("\n\n")
+
+	// Welcome message
+	welcomeMsg := lipgloss.NewStyle().
+		Width(70).
+		Align(lipgloss.Center).
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Render("Welcome to the GitHub MCP Server Configuration Wizard!")
+	s.WriteString(welcomeMsg)
+	s.WriteString("\n\n")
+
+	// Description
+	description := []string{
+		"This interactive tool helps you customize your MCP server by selecting",
+		"which tools you want to enable. You'll be able to:",
+		"",
+	}
+
+	for _, line := range description {
+		centered := lipgloss.NewStyle().
+			Width(70).
+			Align(lipgloss.Center).
+			Foreground(lipgloss.Color("#888888")).
+			Render(line)
+		s.WriteString(centered)
+		s.WriteString("\n")
+	}
+
+	// Features
+	features := []string{
+		accentStyle.Render("  ✓") + " Browse all available GitHub tools",
+		accentStyle.Render("  ✓") + " Search and filter by name or category",
+		accentStyle.Render("  ✓") + " Select only the tools you need",
+		accentStyle.Render("  ✓") + " Generate ready-to-use configuration",
+	}
+
+	for _, feature := range features {
+		centered := lipgloss.NewStyle().
+			Width(70).
+			Align(lipgloss.Center).
+			Render(feature)
+		s.WriteString(centered)
+		s.WriteString("\n")
+	}
+
+	s.WriteString("\n\n")
+
+	// Call to action with a pulsing effect
+	ctaMain := lipgloss.NewStyle().
+		Width(70).
+		Align(lipgloss.Center).
+		Foreground(lipgloss.Color("#7D56F4")).
+		Bold(true).
+		Render("Press ENTER or SPACE to continue")
+	s.WriteString(ctaMain)
+	s.WriteString("\n")
+
+	ctaQuit := lipgloss.NewStyle().
+		Width(70).
+		Align(lipgloss.Center).
+		Foreground(lipgloss.Color("#888888")).
+		Render("(or press 'q' to quit)")
+	s.WriteString(ctaQuit)
+	s.WriteString("\n")
+
+	return s.String()
+}
+
 func (m wizardModel) renderConfirmation() string {
 	var s strings.Builder
 
@@ -439,11 +567,10 @@ func (m wizardModel) renderConfirmation() string {
 		}
 	}
 
-	// Build command args
+	// Build command args - use package path instead of individual files
 	cmdArgs := []string{
 		"run",
-		"cmd/github-mcp-server/main.go",
-		"cmd/github-mcp-server/wizard.go",
+		"./cmd/github-mcp-server",
 		"stdio",
 	}
 
@@ -560,8 +687,17 @@ func runWizard(cmd *cobra.Command, args []string) error {
 		tea.WithAltScreen(),
 	)
 
-	if _, err := p.Run(); err != nil {
+	finalModel, err := p.Run()
+	if err != nil {
 		return fmt.Errorf("error running wizard: %w", err)
+	}
+
+	// Cast the final model and print confirmation if needed
+	if m, ok := finalModel.(wizardModel); ok {
+		if m.confirmed {
+			// Print the confirmation output after exiting alt screen
+			fmt.Print(m.renderConfirmation())
+		}
 	}
 
 	return nil
