@@ -103,7 +103,7 @@ func init() {
 
 	// Add subcommands
 	rootCmd.AddCommand(stdioCmd)
-	rootCmd.AddCommand(wizardCmd)
+	rootCmd.AddCommand(configureCmd)
 }
 
 func initConfig() {

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# This script runs the interactive configuration CLI program for the GitHub MCP server.
+# It helps you select which tools to enable and generates the configuration.
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+go run ./cmd/github-mcp-server configure

@@ -15,14 +15,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var wizardCmd = &cobra.Command{
-	Use:   "wizard",
-	Short: "Interactive configuration wizard for GitHub MCP Server",
-	Long:  `This wizard will help you configure which specific tools to enable.`,
-	RunE:  runWizard,
+var configureCmd = &cobra.Command{
+	Use:   "configure",
+	Short: "Interactive configuration tool for GitHub MCP Server",
+	Long:  `This interactive tool will help you configure which specific tools to enable.`,
+	RunE:  runConfigure,
 }
 
-// Styles for the wizard UI
+// Styles for the configuration UI
 var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -98,7 +98,7 @@ const asciiArt = `
  | |__| | | |_| |  | | |_| | |_) | | |  | | |____| |     
   \_____|_|\__|_|  |_|\__,_|_.__/  |_|  |_|\_____|_|     
                                                           
-           🧙  Configuration Wizard  🔧                    
+           🔧  Configuration Tool  ⚙️                     
 `
 
 type toolInfo struct {
@@ -114,7 +114,7 @@ type toolsetInfo struct {
 	tools       []toolInfo
 }
 
-type wizardModel struct {
+type configureModel struct {
 	toolsets       []toolsetInfo
 	allTools       []toolInfo
 	filteredTools  []toolInfo
@@ -130,14 +130,14 @@ type wizardModel struct {
 	showWelcome    bool
 }
 
-func initialWizardModel(toolsets []toolsetInfo) wizardModel {
+func initialConfigureModel(toolsets []toolsetInfo) configureModel {
 	// Flatten all tools
 	var allTools []toolInfo
 	for _, ts := range toolsets {
 		allTools = append(allTools, ts.tools...)
 	}
 
-	return wizardModel{
+	return configureModel{
 		toolsets:      toolsets,
 		allTools:      allTools,
 		filteredTools: allTools,
@@ -148,11 +148,11 @@ func initialWizardModel(toolsets []toolsetInfo) wizardModel {
 	}
 }
 
-func (m wizardModel) Init() tea.Cmd {
+func (m configureModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m wizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m configureModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -277,7 +277,7 @@ func (m wizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *wizardModel) applyFilter() {
+func (m *configureModel) applyFilter() {
 	if m.filter == "" {
 		m.filteredTools = m.allTools
 	} else {
@@ -295,7 +295,7 @@ func (m *wizardModel) applyFilter() {
 	m.viewportOffset = 0
 }
 
-func (m *wizardModel) adjustViewport() {
+func (m *configureModel) adjustViewport() {
 	maxVisible := m.height - 10 // Reserve space for header and footer
 	if maxVisible < 1 {
 		maxVisible = 10
@@ -308,7 +308,7 @@ func (m *wizardModel) adjustViewport() {
 	}
 }
 
-func (m wizardModel) View() string {
+func (m configureModel) View() string {
 	if m.quitting && !m.confirmed {
 		return dimStyle.Render("\nConfiguration cancelled.\n")
 	}
@@ -326,7 +326,7 @@ func (m wizardModel) View() string {
 	var s strings.Builder
 
 	// Header
-	s.WriteString(titleStyle.Render("🧙 GitHub MCP Server Configuration Wizard"))
+	s.WriteString(titleStyle.Render("🔧 GitHub MCP Server Configuration Tool"))
 	s.WriteString("\n")
 	s.WriteString(subtitleStyle.Render("Select the tools you want to enable for your MCP server"))
 	s.WriteString("\n")
@@ -432,7 +432,7 @@ func (m wizardModel) View() string {
 	return s.String()
 }
 
-func (m wizardModel) renderWelcome() string {
+func (m configureModel) renderWelcome() string {
 	var s strings.Builder
 
 	// Center the content vertically
@@ -455,7 +455,7 @@ func (m wizardModel) renderWelcome() string {
 		Width(70).
 		Align(lipgloss.Center).
 		Foreground(lipgloss.Color("#FFFFFF")).
-		Render("Welcome to the GitHub MCP Server Configuration Wizard!")
+		Render("Welcome to the GitHub MCP Server Configuration Tool!")
 	s.WriteString(welcomeMsg)
 	s.WriteString("\n\n")
 
@@ -516,7 +516,7 @@ func (m wizardModel) renderWelcome() string {
 	return s.String()
 }
 
-func (m wizardModel) renderConfirmation() string {
+func (m configureModel) renderConfirmation() string {
 	var s strings.Builder
 
 	// Get selected tools
@@ -677,23 +677,23 @@ func getFirstSentence(description string) string {
 }
 
 
-func runWizard(cmd *cobra.Command, args []string) error {
+func runConfigure(cmd *cobra.Command, args []string) error {
 	// Dynamically get available toolsets
 	toolsets := getAvailableToolsets()
 
 	// Create and run the Bubble Tea program
 	p := tea.NewProgram(
-		initialWizardModel(toolsets),
+		initialConfigureModel(toolsets),
 		tea.WithAltScreen(),
 	)
 
 	finalModel, err := p.Run()
 	if err != nil {
-		return fmt.Errorf("error running wizard: %w", err)
+		return fmt.Errorf("error running configuration: %w", err)
 	}
 
 	// Cast the final model and print confirmation if needed
-	if m, ok := finalModel.(wizardModel); ok {
+	if m, ok := finalModel.(configureModel); ok {
 		if m.confirmed {
 			// Print the confirmation output after exiting alt screen
 			fmt.Print(m.renderConfirmation())
