@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -11,8 +12,10 @@ import (
 	"github.com/github/github-mcp-server/pkg/github"
 	"github.com/github/github-mcp-server/pkg/raw"
 	gogithub "github.com/google/go-github/v74/github"
+	"github.com/mark3labs/mcp-go/server"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
+	"github.com/tiktoken-go/tokenizer"
 )
 
 var configureCmd = &cobra.Command{
@@ -71,6 +74,9 @@ var (
 	toolsetBadgeStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#84a5ecff"))
 
+	tokenBadgeStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#e8b75aff"))
+
 	successStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#00FF00")).
 			Bold(true)
@@ -100,6 +106,7 @@ type toolInfo struct {
 	description string
 	toolsetName string
 	isReadOnly  bool
+	tokenCount  int    // Estimated token count for this tool's definition
 }
 
 type toolsetInfo struct {
@@ -122,9 +129,17 @@ type configureModel struct {
 	confirmed      bool
 	viewportOffset int
 	showWelcome    bool
+	encoder        tokenizer.Codec // Tokenizer encoder for counting tokens
 }
 
 func initialConfigureModel(toolsets []toolsetInfo) configureModel {
+	// Initialize tokenizer
+	enc, err := tokenizer.Get(tokenizer.Cl100kBase)
+	if err != nil {
+		// If tokenizer fails to initialize, continue without it
+		enc = nil
+	}
+
 	// Flatten all tools
 	var allTools []toolInfo
 	for _, ts := range toolsets {
@@ -144,6 +159,7 @@ func initialConfigureModel(toolsets []toolsetInfo) configureModel {
 		width:         80,
 		height:        24,
 		showWelcome:   true, // Start with welcome screen
+		encoder:       enc,
 	}
 }
 
@@ -352,10 +368,15 @@ func (m configureModel) View() string {
 		visibleEnd = len(m.filteredTools)
 	}
 
+	// Calculate selected count and total tokens
 	selectedCount := 0
-	for _, selected := range m.selected {
+	totalTokens := 0
+	for i, selected := range m.selected {
 		if selected {
 			selectedCount++
+			if i < len(m.filteredTools) {
+				totalTokens += m.filteredTools[i].tokenCount
+			}
 		}
 	}
 
@@ -392,10 +413,17 @@ func (m configureModel) View() string {
 			category := toolsetBadgeStyle.Render(fmt.Sprintf("[%s]", tool.toolsetName))
 			line += category
 
+			// Add token count if available
+			if tool.tokenCount > 0 {
+				tokenBadge := tokenBadgeStyle.Render(fmt.Sprintf(" ~%s tokens", formatTokenCount(tool.tokenCount)))
+				line += tokenBadge
+			}
+
 			// Add description (truncated if needed)
 			desc := getFirstSentence(tool.description)
-			if len(desc) > 60 {
-				desc = desc[:57] + "..."
+			maxDescLen := 45 // Reduced to make room for token count
+			if len(desc) > maxDescLen {
+				desc = desc[:maxDescLen-3] + "..."
 			}
 			line += " " + dimStyle.Render(desc)
 
@@ -415,7 +443,11 @@ func (m configureModel) View() string {
 	s.WriteString("\n")
 
 	// Footer with help
-	s.WriteString(helpStyle.Render(fmt.Sprintf("Selected: %d tools", selectedCount)))
+	footerInfo := fmt.Sprintf("Selected: %d tools", selectedCount)
+	if m.encoder != nil && totalTokens > 0 {
+		footerInfo += fmt.Sprintf(" • Estimated tokens: ~%s", formatTokenCount(totalTokens))
+	}
+	s.WriteString(helpStyle.Render(footerInfo))
 	s.WriteString("\n")
 	s.WriteString(helpStyle.Render("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"))
 	s.WriteString("\n")
@@ -520,9 +552,11 @@ func (m configureModel) renderConfirmation() string {
 
 	// Get selected tools
 	var selectedTools []string
+	totalTokens := 0
 	for i, selected := range m.selected {
 		if selected && i < len(m.filteredTools) {
 			selectedTools = append(selectedTools, m.filteredTools[i].name)
+			totalTokens += m.filteredTools[i].tokenCount
 		}
 	}
 
@@ -532,8 +566,16 @@ func (m configureModel) renderConfirmation() string {
 	s.WriteString("\n")
 	s.WriteString(successStyle.Render("✅ Configuration Complete!"))
 	s.WriteString("\n\n")
+	
+	// Add token summary
+	if m.encoder != nil && totalTokens > 0 {
+		s.WriteString(itemStyle.Render(fmt.Sprintf("📊 Total Estimated Tokens: ~%s", formatTokenCount(totalTokens))))
+		s.WriteString("\n")
+		s.WriteString(dimStyle.Render("    This is an approximation"))
+		s.WriteString("\n\n")
+	}
+	
 	s.WriteString(titleStyle.Render("Selected Tools:"))
-	s.WriteString("\n")
 
 	if len(selectedTools) == 0 {
 		s.WriteString(dimStyle.Render("  (none - all tools will be enabled by default)"))
@@ -616,6 +658,12 @@ func getAvailableToolsets() []toolsetInfo {
 		return defaultValue
 	}
 	
+	// Initialize tokenizer for token counting
+	enc, err := tokenizer.Get(tokenizer.Cl100kBase)
+	if err != nil {
+		enc = nil // Continue without tokenizer if it fails
+	}
+	
 	// Create a dummy toolset group to extract the structure
 	// We use read-only false to get all tools
 	tsg := github.DefaultToolsetGroup(false, getClient, getGQLClient, getRawClient, translator, 5000)
@@ -632,12 +680,19 @@ func getAvailableToolsets() []toolsetInfo {
 		// Get all available tools (both read and write)
 		allTools := toolset.GetAvailableTools()
 		for _, tool := range allTools {
-			ts.tools = append(ts.tools, toolInfo{
+			toolInfo := toolInfo{
 				name:        tool.Tool.Name,
 				description: tool.Tool.Description,
 				toolsetName: toolsetName,
 				isReadOnly:  tool.Tool.Annotations.ReadOnlyHint != nil && *tool.Tool.Annotations.ReadOnlyHint,
-			})
+			}
+			
+			// Estimate token count for this tool using the actual MCP tool
+			if enc != nil {
+				toolInfo.tokenCount = estimateToolTokens(enc, tool)
+			}
+			
+			ts.tools = append(ts.tools, toolInfo)
 		}
 		
 		// Sort tools by name
@@ -668,6 +723,34 @@ func getFirstSentence(description string) string {
     }
     // If no period at all, return as is
     return description
+}
+
+// estimateToolTokens estimates the token count for a tool's MCP definition
+// This serializes the complete tool definition (name, description, annotations, inputSchema)
+// to approximate the token count that will be sent to the LLM in the tools/list response
+func estimateToolTokens(enc tokenizer.Codec, mcpTool server.ServerTool) int {
+	if enc == nil {
+		return 0
+	}
+
+	// Serialize the full MCP tool definition to JSON
+	// This is what gets sent to the LLM in the tools/list response
+	jsonBytes, err := json.Marshal(mcpTool.Tool)
+	if err != nil {
+		return 0
+	}
+
+	// Encode and count tokens
+	tokens, _, _ := enc.Encode(string(jsonBytes))
+	return len(tokens)
+}
+
+// formatTokenCount formats token count with K suffix for thousands
+func formatTokenCount(count int) string {
+	if count >= 1000 {
+		return fmt.Sprintf("%.1fK", float64(count)/1000)
+	}
+	return fmt.Sprintf("%d", count)
 }
 
 
