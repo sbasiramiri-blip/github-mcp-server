@@ -60,7 +60,7 @@ jobs:
             TAG_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
           else
             LATEST_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$' | head -n 1)
-            [ -z "$LATEST_TAG" ] && { echo "No release tag found"; exit 1; }
+            [ -z "$LATEST_TAG" ] && { echo "No release tag found. Cannot determine version."; exit 1; }
             TAG_VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
             echo "Using latest tag: $LATEST_TAG"
           fi
