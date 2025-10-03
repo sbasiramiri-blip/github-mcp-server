@@ -68,22 +68,18 @@ var (
 	dimStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#666666"))
 
+	toolsetBadgeStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#84a5ecff"))
+
 	successStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#00FF00")).
 			Bold(true)
 
-	errorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF0000")).
-			Bold(true)
 
 	asciiArtStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#7D56F4")).
 			Bold(true)
 
-	welcomeTextStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#FFFFFF")).
-				MarginTop(1).
-				MarginBottom(1)
 
 	accentStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#00D7FF")).
@@ -91,15 +87,13 @@ var (
 )
 
 const asciiArt = `
-   _____ _ _   _    _       _       __  __  _____ _____  
-  / ____(_) | | |  | |     | |     |  \/  |/ ____|  __ \ 
- | |  __ _| |_| |__| |_   _| |__   | \  / | |    | |__) |
- | | |_ | | __|  __  | | | | '_ \  | |\/| | |    |  ___/ 
- | |__| | | |_| |  | | |_| | |_) | | |  | | |____| |     
-  \_____|_|\__|_|  |_|\__,_|_.__/  |_|  |_|\_____|_|     
-                                                          
-           🔧  Configuration Tool  ⚙️                     
-`
+   _____ _ _   _    _       _      __  __  _____ _____    _____                          
+  / ____(_) | | |  | |     | |    |  \/  |/ ____|  __ \  / ____|                         
+ | |  __ _| |_| |__| |_   _| |__  | \  / | |    | |__) || (___   ___ _ ____   _____ _ __ 
+ | | |_ | | __|  __  | | | | '_ \ | |\/| | |    |  ___/  \___ \ / _ \ '__\ \ / / _ \ '__|
+ | |__| | | |_| |  | | |_| | |_)  | |  | | |____| |      ____) |  __/ |   \ V /  __/ |   
+  \_____|_|\__|_|  |_|\__,_|_.__/ |_|  |_|\_____|_|     |_____/ \___|_|    \_/ \___|_|   
+                                                                                         `
 
 type toolInfo struct {
 	name        string
@@ -136,6 +130,11 @@ func initialConfigureModel(toolsets []toolsetInfo) configureModel {
 	for _, ts := range toolsets {
 		allTools = append(allTools, ts.tools...)
 	}
+
+	// Sort all tools alphabetically by name
+	sort.Slice(allTools, func(i, j int) bool {
+		return allTools[i].name < allTools[j].name
+	})
 
 	return configureModel{
 		toolsets:      toolsets,
@@ -390,7 +389,7 @@ func (m configureModel) View() string {
 			)
 
 			// Add category badge
-			category := dimStyle.Render(fmt.Sprintf("[%s]", tool.toolsetName))
+			category := toolsetBadgeStyle.Render(fmt.Sprintf("[%s]", tool.toolsetName))
 			line += category
 
 			// Add description (truncated if needed)
@@ -584,22 +583,17 @@ func (m configureModel) renderConfirmation() string {
 	s.WriteString("\n\n")
 
 	// Print JSON format
-	s.WriteString(dimStyle.Render(`"args": [`))
+	s.WriteString(itemStyle.Render(`"args": [`))
 	s.WriteString("\n")
 	for i, arg := range cmdArgs {
 		comma := ","
 		if i == len(cmdArgs)-1 {
 			comma = ""
 		}
-		s.WriteString(dimStyle.Render(fmt.Sprintf(`    "%s"%s`, arg, comma)))
+		s.WriteString(itemStyle.Render(fmt.Sprintf(`    "%s"%s`, arg, comma)))
 		s.WriteString("\n")
 	}
-	s.WriteString(dimStyle.Render(`],`))
-	s.WriteString("\n\n")
-
-	s.WriteString(titleStyle.Render("Or run directly with:"))
-	s.WriteString("\n")
-	s.WriteString(successStyle.Render(fmt.Sprintf("go %s", strings.Join(cmdArgs, " "))))
+	s.WriteString(itemStyle.Render(`],`))
 	s.WriteString("\n\n")
 
 	return s.String()
