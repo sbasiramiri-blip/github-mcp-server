@@ -1257,6 +1257,7 @@ The following sets of tools are available (all are on by default):
 - **list_copilot_spaces** - List Copilot Spaces
 </details>
 
+<details>
 <summary>Web Search</summary>
 
 - **web_search** - Web Search
