@@ -1161,8 +1161,9 @@ Possible options:
 </details>
 
 <details>
+
 <summary>Web Search</summary>
-Note: Only available for users on a paid Copilot subscription, and with Web search enabled.
+> **Note:** Only available for users on a paid Copilot subscription, and with Web search enabled.
 
 -   **web_search** - Web Search
     -   `query`: A natural language query representing what to search for on the web. (string, required)
