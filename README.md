@@ -1160,6 +1160,7 @@ Possible options:
 -   **list_copilot_spaces** - List Copilot Spaces
 </details>
 
+<details>
 <summary>Web Search</summary>
 Note: Only available for users on a paid Copilot subscription, and with Web search enabled.
 
