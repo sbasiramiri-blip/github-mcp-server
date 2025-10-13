@@ -71,6 +71,18 @@ func getGeneralInstructions(enabledToolsets []string) string {
 			instruction:      "Use get_pull_request to fetch PR details and get_pull_request_files to see changes. Use create_pending_pull_request_review to start a review, add_comment_to_pending_review for line-specific feedback, then submit_pending_pull_request_review to publish. Check get_pull_request_status to verify CI/CD checks before approving.",
 			requiredToolsets: []string{"pull_requests"},
 		},
+		"Triaging Security Alerts": {
+			instruction:      "Use list_dependabot_alerts, list_code_scanning_alerts, or list_secret_scanning_alerts with state='open' to find active security issues. Use get_*_alert for detailed information about specific alerts. For broader context, search list_global_security_advisories or get_global_security_advisory for known CVEs affecting your dependencies.",
+			requiredToolsets: []string{},
+		},
+		"Manage Workflow": {
+			instruction:      "Call list_notifications regularly to see what needs attention. Use get_notification_details for full context on important items. Mark items as done with dismiss_notification or mark_all_notifications_read to keep your inbox organized. Use manage_notification_subscription to adjust notification preferences for threads or manage_repository_notification_subscription for entire repositories.",
+			requiredToolsets: []string{"notifications"},
+		},
+		"Investigating Bugs": {
+			instruction:      "Use search_code to find relevant code patterns or function definitions across repositories. Use search_issues to check if similar bugs were reported before. Once you find relevant files, use get_file_contents to read them. Review get_commit and list_commits to understand recent changes that might have introduced the issue.",
+			requiredToolsets: []string{"repos"},
+		},
 	}
 
 	var parts []string
