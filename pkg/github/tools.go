@@ -188,7 +188,6 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(AddSubIssue(getClient, t)),
 			toolsets.NewServerTool(RemoveSubIssue(getClient, t)),
 			toolsets.NewServerTool(ReprioritizeSubIssue(getClient, t)),
-			toolsets.NewServerTool(WriteLabel(getGQLClient, t)),
 		).AddPrompts(
 		toolsets.NewServerPrompt(AssignCodingAgentPrompt(t)),
 		toolsets.NewServerPrompt(IssueToFixWorkflowPrompt(t)),
@@ -215,11 +214,8 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(RequestCopilotReview(getClient, t)),
 
 			// Reviews
-			toolsets.NewServerTool(CreateAndSubmitPullRequestReview(getGQLClient, t)),
-			toolsets.NewServerTool(CreatePendingPullRequestReview(getGQLClient, t)),
+			toolsets.NewServerTool(PullRequestReviewWrite(getGQLClient, t)),
 			toolsets.NewServerTool(AddCommentToPendingReview(getGQLClient, t)),
-			toolsets.NewServerTool(SubmitPendingPullRequestReview(getGQLClient, t)),
-			toolsets.NewServerTool(DeletePendingPullRequestReview(getGQLClient, t)),
 		)
 	codeSecurity := toolsets.NewToolset(ToolsetMetadataCodeSecurity.ID, ToolsetMetadataCodeSecurity.Description).
 		AddReadTools(
@@ -316,6 +312,7 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 		AddWriteTools(
 			toolsets.NewServerTool(AddProjectItem(getClient, t)),
 			toolsets.NewServerTool(DeleteProjectItem(getClient, t)),
+			toolsets.NewServerTool(UpdateProjectItem(getClient, t)),
 		)
 	stargazers := toolsets.NewToolset(ToolsetMetadataStargazers.ID, ToolsetMetadataStargazers.Description).
 		AddReadTools(
@@ -334,7 +331,7 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 		).
 		AddWriteTools(
 			// create or update
-			toolsets.NewServerTool(WriteLabel(getGQLClient, t)),
+			toolsets.NewServerTool(LabelWrite(getGQLClient, t)),
 		)
 	// Add toolsets to the group
 	tsg.AddToolset(contextTools)

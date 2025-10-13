@@ -98,6 +98,27 @@ The default configuration is:
 
 See [Remote Server Documentation](docs/remote-server.md) for full details on remote server configuration, toolsets, headers, and advanced usage. This file provides comprehensive instructions and examples for connecting, customizing, and installing the remote GitHub MCP Server in VS Code and other MCP hosts.
 
+#### Enterprise Cloud with data residency (ghe.com)
+
+GitHub Enterprise Cloud can also make use of the remote server.
+
+Example for `https://octocorp.ghe.com`:
+```
+{
+    ...
+    "proxima-github": {
+      "type": "http",
+      "url": "https://copilot-api.octocorp.ghe.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${input:github_mcp_pat}"
+      }
+    },
+    ...
+}
+```
+
+GitHub Enterprise Server does not support remote server hosting. Please refer to [GitHub Enterprise Server and Enterprise Cloud with data residency (ghe.com)](#github-enterprise-server-and-enterprise-cloud-with-data-residency-ghecom) from the local server configuration.
+
 ---
 
 ## Local GitHub MCP Server
@@ -159,6 +180,33 @@ To keep your GitHub PAT secure and reusable across different MCP hosts:
   ```
 
 </details>
+
+### GitHub Enterprise Server and Enterprise Cloud with data residency (ghe.com)
+
+The flag `--gh-host` and the environment variable `GITHUB_HOST` can be used to set
+the hostname for GitHub Enterprise Server or GitHub Enterprise Cloud with data residency.
+
+- For GitHub Enterprise Server, prefix the hostname with the `https://` URI scheme, as it otherwise defaults to `http://`, which GitHub Enterprise Server does not support.
+- For GitHub Enterprise Cloud with data residency, use `https://YOURSUBDOMAIN.ghe.com` as the hostname.
+``` json
+"github": {
+    "command": "docker",
+    "args": [
+    "run",
+    "-i",
+    "--rm",
+    "-e",
+    "GITHUB_PERSONAL_ACCESS_TOKEN",
+    "-e",
+    "GITHUB_HOST",
+    "ghcr.io/github/github-mcp-server"
+    ],
+    "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${input:github_token}",
+        "GITHUB_HOST": "https://<your GHES or ghe.com domain name>"
+    }
+}
+```
 
 ## Installation
 
@@ -668,15 +716,6 @@ The following sets of tools are available (all are on by default):
   - `title`: New title (string, optional)
   - `type`: New issue type (string, optional)
 
-- **write_label** - Write operations on repository labels.
-  - `color`: Label color as 6-character hex code without '#' prefix (e.g., 'f29513'). Required for 'create', optional for 'update'. (string, optional)
-  - `description`: Label description text. Optional for 'create' and 'update'. (string, optional)
-  - `method`: Operation to perform: 'create', 'update', or 'delete' (string, required)
-  - `name`: Label name - required for all operations (string, required)
-  - `new_name`: New name for the label (used only with 'update' method to rename) (string, optional)
-  - `owner`: Repository owner (username or organization name) (string, required)
-  - `repo`: Repository name (string, required)
-
 </details>
 
 <details>
@@ -688,12 +727,7 @@ The following sets of tools are available (all are on by default):
   - `owner`: Repository owner (username or organization name) (string, required)
   - `repo`: Repository name (string, required)
 
-- **list_label** - List labels from a repository or an issue
-  - `issue_number`: Issue number - if provided, lists labels on the specific issue (number, optional)
-  - `owner`: Repository owner (username or organization name) - required for all operations (string, required)
-  - `repo`: Repository name - required for all operations (string, required)
-
-- **write_label** - Write operations on repository labels.
+- **label_write** - Write operations on repository labels.
   - `color`: Label color as 6-character hex code without '#' prefix (e.g., 'f29513'). Required for 'create', optional for 'update'. (string, optional)
   - `description`: Label description text. Optional for 'create' and 'update'. (string, optional)
   - `method`: Operation to perform: 'create', 'update', or 'delete' (string, required)
@@ -701,6 +735,11 @@ The following sets of tools are available (all are on by default):
   - `new_name`: New name for the label (used only with 'update' method to rename) (string, optional)
   - `owner`: Repository owner (username or organization name) (string, required)
   - `repo`: Repository name (string, required)
+
+- **list_label** - List labels from a repository or an issue
+  - `issue_number`: Issue number - if provided, lists labels on the specific issue (number, optional)
+  - `owner`: Repository owner (username or organization name) - required for all operations (string, required)
+  - `repo`: Repository name - required for all operations (string, required)
 
 </details>
 
@@ -806,6 +845,13 @@ The following sets of tools are available (all are on by default):
   - `per_page`: Number of results per page (max 100, default: 30) (number, optional)
   - `query`: Filter projects by a search query (matches title and description) (string, optional)
 
+- **update_project_item** - Update project item
+  - `item_id`: The unique identifier of the project item. This is not the issue or pull request ID. (number, required)
+  - `owner`: If owner_type == user it is the handle for the GitHub user account. If owner_type == org it is the name of the organization. The name is not case sensitive. (string, required)
+  - `owner_type`: Owner type (string, required)
+  - `project_number`: The project's number. (number, required)
+  - `updated_field`: Object consisting of the ID of the project field to update and the new value for the field. To clear the field, set "value" to null. Example: {"id": 123456, "value": "New Value"} (object, required)
+
 </details>
 
 <details>
@@ -824,20 +870,6 @@ The following sets of tools are available (all are on by default):
   - `startSide`: For multi-line comments, the starting side of the diff that the comment applies to. LEFT indicates the previous state, RIGHT indicates the new state (string, optional)
   - `subjectType`: The level at which the comment is targeted (string, required)
 
-- **create_and_submit_pull_request_review** - Create and submit a pull request review without comments
-  - `body`: Review comment text (string, required)
-  - `commitID`: SHA of commit to review (string, optional)
-  - `event`: Review action to perform (string, required)
-  - `owner`: Repository owner (string, required)
-  - `pullNumber`: Pull request number (number, required)
-  - `repo`: Repository name (string, required)
-
-- **create_pending_pull_request_review** - Create pending pull request review
-  - `commitID`: SHA of commit to review (string, optional)
-  - `owner`: Repository owner (string, required)
-  - `pullNumber`: Pull request number (number, required)
-  - `repo`: Repository name (string, required)
-
 - **create_pull_request** - Open new pull request
   - `base`: Branch to merge into (string, required)
   - `body`: PR description (string, optional)
@@ -847,11 +879,6 @@ The following sets of tools are available (all are on by default):
   - `owner`: Repository owner (string, required)
   - `repo`: Repository name (string, required)
   - `title`: PR title (string, required)
-
-- **delete_pending_pull_request_review** - Delete the requester's latest pending pull request review
-  - `owner`: Repository owner (string, required)
-  - `pullNumber`: Pull request number (number, required)
-  - `repo`: Repository name (string, required)
 
 - **list_pull_requests** - List pull requests
   - `base`: Filter by base branch (string, optional)
@@ -888,6 +915,15 @@ Possible options:
   - `pullNumber`: Pull request number (number, required)
   - `repo`: Repository name (string, required)
 
+- **pull_request_review_write** - Write operations (create, submit, delete) on pull request reviews.
+  - `body`: Review comment text (string, optional)
+  - `commitID`: SHA of commit to review (string, optional)
+  - `event`: Review action to perform. (string, optional)
+  - `method`: The write operation to perform on pull request review. (string, required)
+  - `owner`: Repository owner (string, required)
+  - `pullNumber`: Pull request number (number, required)
+  - `repo`: Repository name (string, required)
+
 - **request_copilot_review** - Request Copilot review
   - `owner`: Repository owner (string, required)
   - `pullNumber`: Pull request number (number, required)
@@ -901,13 +937,6 @@ Possible options:
   - `query`: Search query using GitHub pull request search syntax (string, required)
   - `repo`: Optional repository name. If provided with owner, only pull requests for this repository are listed. (string, optional)
   - `sort`: Sort field by number of matches of categories, defaults to best match (string, optional)
-
-- **submit_pending_pull_request_review** - Submit the requester's latest pending pull request review
-  - `body`: The text of the review comment (string, optional)
-  - `event`: The event to perform (string, required)
-  - `owner`: Repository owner (string, required)
-  - `pullNumber`: Pull request number (number, required)
-  - `repo`: Repository name (string, required)
 
 - **update_pull_request** - Edit pull request
   - `base`: New base branch name (string, optional)
@@ -1198,33 +1227,6 @@ docker run -i --rm \
   -e GITHUB_PERSONAL_ACCESS_TOKEN=<your-token> \
   -e GITHUB_READ_ONLY=1 \
   ghcr.io/github/github-mcp-server
-```
-
-## GitHub Enterprise Server and Enterprise Cloud with data residency (ghe.com)
-
-The flag `--gh-host` and the environment variable `GITHUB_HOST` can be used to set
-the hostname for GitHub Enterprise Server or GitHub Enterprise Cloud with data residency.
-
-- For GitHub Enterprise Server, prefix the hostname with the `https://` URI scheme, as it otherwise defaults to `http://`, which GitHub Enterprise Server does not support.
-- For GitHub Enterprise Cloud with data residency, use `https://YOURSUBDOMAIN.ghe.com` as the hostname.
-``` json
-"github": {
-    "command": "docker",
-    "args": [
-    "run",
-    "-i",
-    "--rm",
-    "-e",
-    "GITHUB_PERSONAL_ACCESS_TOKEN",
-    "-e",
-    "GITHUB_HOST",
-    "ghcr.io/github/github-mcp-server"
-    ],
-    "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${input:github_token}",
-        "GITHUB_HOST": "https://<your GHES or ghe.com domain name>"
-    }
-}
 ```
 
 ## i18n / Overriding Descriptions
