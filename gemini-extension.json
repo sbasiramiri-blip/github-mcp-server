@@ -1,5 +1,5 @@
 {
-  "name": "GitHub MCP Server",
+  "name": "github-mcp-server",
   "version": "0.18.0",
   "description": "Connect AI assistants to GitHub - manage repos, issues, PRs, and workflows through natural language.",
   "mcpServers": {
