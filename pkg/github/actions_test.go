@@ -1319,3 +1319,159 @@ func Test_MemoryUsage_SlidingWindow_vs_NoWindow(t *testing.T) {
 	t.Logf("Sliding window: %s", profile1.String())
 	t.Logf("No window: %s", profile2.String())
 }
+
+func Test_ActionsRead_Workflow(t *testing.T) {
+	// Verify tool definition once
+	mockClient := github.NewClient(nil)
+	tool, _ := ActionsRead(stubGetClientFn(mockClient), translations.NullTranslationHelper)
+
+	assert.Equal(t, "actions_resource_read", tool.Name)
+	assert.NotEmpty(t, tool.Description)
+	assert.Contains(t, tool.InputSchema.Properties, "resource")
+	assert.Contains(t, tool.InputSchema.Properties, "owner")
+	assert.Contains(t, tool.InputSchema.Properties, "repo")
+	assert.Contains(t, tool.InputSchema.Properties, "resource_id")
+	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"resource", "owner", "repo", "resource_id"})
+
+	tests := []struct {
+		name           string
+		mockedClient   *http.Client
+		requestArgs    map[string]any
+		expectError    bool
+		expectedErrMsg string
+	}{
+		{
+			name:         "missing required parameter resource",
+			mockedClient: mock.NewMockedHTTPClient(),
+			requestArgs: map[string]any{
+				"owner":       "owner",
+				"repo":        "repo",
+				"resource_id": float64(123),
+			},
+			expectError:    true,
+			expectedErrMsg: "missing required parameter: resource",
+		},
+		{
+			name:         "missing required parameter owner",
+			mockedClient: mock.NewMockedHTTPClient(),
+			requestArgs: map[string]any{
+				"resource":    "workflow",
+				"repo":        "repo",
+				"resource_id": float64(123),
+			},
+			expectError:    true,
+			expectedErrMsg: "missing required parameter: owner",
+		},
+		{
+			name:         "missing required parameter repo",
+			mockedClient: mock.NewMockedHTTPClient(),
+			requestArgs: map[string]any{
+				"resource":    "workflow",
+				"owner":       "owner",
+				"resource_id": float64(123),
+			},
+			expectError:    true,
+			expectedErrMsg: "missing required parameter: repo",
+		},
+		{
+			name:         "missing required parameter resource_id",
+			mockedClient: mock.NewMockedHTTPClient(),
+			requestArgs: map[string]any{
+				"owner":    "owner",
+				"repo":     "repo",
+				"resource": "workflow",
+			},
+			expectError:    true,
+			expectedErrMsg: "missing required parameter: resource_id",
+		},
+		{
+			name:         "unknown resource",
+			mockedClient: mock.NewMockedHTTPClient(),
+			requestArgs: map[string]any{
+				"resource":    "random",
+				"owner":       "owner",
+				"repo":        "repo",
+				"resource_id": float64(123),
+			},
+			expectError:    true,
+			expectedErrMsg: "unknown resource type: random",
+		},
+		{
+			name: "successful workflow read",
+			mockedClient: mock.NewMockedHTTPClient(
+				mock.WithRequestMatchHandler(
+					mock.GetReposActionsWorkflowsByOwnerByRepoByWorkflowId,
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						workflow := &github.Workflow{
+							ID:     github.Ptr(int64(1)),
+							NodeID: github.Ptr("W_1"),
+							Name:   github.Ptr("CI"),
+							Path:   github.Ptr(".github/workflows/test.yaml"),
+							State:  github.Ptr("active"),
+						}
+						w.WriteHeader(http.StatusOK)
+						_ = json.NewEncoder(w).Encode(workflow)
+					}),
+				),
+			),
+			requestArgs: map[string]any{
+				"resource":    "workflow",
+				"owner":       "owner",
+				"repo":        "repo",
+				"resource_id": float64(1),
+			},
+			expectError: false,
+		},
+		{
+			name: "missing workflow read",
+			mockedClient: mock.NewMockedHTTPClient(
+				mock.WithRequestMatchHandler(
+					mock.GetReposActionsWorkflowsByOwnerByRepoByWorkflowId,
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusNotFound)
+					}),
+				),
+			),
+			requestArgs: map[string]any{
+				"resource":    "workflow",
+				"owner":       "owner",
+				"repo":        "repo",
+				"resource_id": float64(2),
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup client with mock
+			client := github.NewClient(tc.mockedClient)
+			_, handler := ActionsRead(stubGetClientFn(client), translations.NullTranslationHelper)
+
+			// Create call request
+			request := createMCPRequest(tc.requestArgs)
+
+			// Call handler
+			result, err := handler(context.Background(), request)
+
+			require.NoError(t, err)
+			require.Equal(t, tc.expectError, result.IsError)
+
+			// Parse the result and get the text content if no error
+			textContent := getTextResult(t, result)
+
+			if tc.expectedErrMsg != "" {
+				assert.Equal(t, tc.expectedErrMsg, textContent.Text)
+				return
+			}
+
+			// Unmarshal and verify the result
+			var response github.Workflow
+			err = json.Unmarshal([]byte(textContent.Text), &response)
+			require.NoError(t, err)
+			assert.NotNil(t, response.ID)
+			assert.NotNil(t, response.Name)
+			assert.NotNil(t, response.Path)
+		})
+	}
+}

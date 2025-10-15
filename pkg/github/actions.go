@@ -22,6 +22,127 @@ const (
 	DescriptionRepositoryName  = "Repository name"
 )
 
+type actionsResource int
+
+const (
+	actionsResourceUnknown actionsResource = iota
+	actionsResourceWorkflow
+	actionsResourceWorkflowRun
+	actionsResourceWorkflowJob
+)
+
+func (r actionsResource) String() string {
+	switch r {
+	case actionsResourceUnknown:
+		return "unknown"
+	case actionsResourceWorkflow:
+		return "workflow"
+	case actionsResourceWorkflowRun:
+		return "workflow_run"
+	case actionsResourceWorkflowJob:
+		return "workflow_job"
+	}
+	return "unknown"
+}
+
+func ActionsResourceFromString(s string) actionsResource {
+	switch strings.ToLower(s) {
+	case "workflow":
+		return actionsResourceWorkflow
+	case "workflow_run":
+		return actionsResourceWorkflowRun
+	case "workflow_job":
+		return actionsResourceWorkflowJob
+	default:
+		return actionsResourceUnknown
+	}
+}
+
+func ActionsRead(getClient GetClientFn, t translations.TranslationHelperFunc) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("actions_resource_read",
+			mcp.WithDescription(t("TOOL_ACTIONS_READ_DESCRIPTION", "Tools for reading GitHub Actions resources")),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:        t("TOOL_ACTIONS_READ_USER_TITLE", "Read GitHub Actions"),
+				ReadOnlyHint: ToBoolPtr(true),
+			}),
+			mcp.WithString("resource",
+				mcp.Required(),
+				mcp.Description("The type of Actions resource to read"),
+				mcp.Enum(
+					actionsResourceWorkflow.String(),
+					actionsResourceWorkflowRun.String(),
+					actionsResourceWorkflowJob.String(),
+				),
+			),
+			mcp.WithString("owner",
+				mcp.Required(),
+				mcp.Description(DescriptionRepositoryOwner),
+			),
+			mcp.WithString("repo",
+				mcp.Required(),
+				mcp.Description(DescriptionRepositoryName),
+			),
+			mcp.WithNumber("resource_id",
+				mcp.Required(),
+				mcp.Description("The unique identifier of the resource"),
+			),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			owner, err := RequiredParam[string](request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := RequiredParam[string](request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			resourceTypeStr, err := RequiredParam[string](request, "resource")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			resourceType := ActionsResourceFromString(resourceTypeStr)
+
+			resourceIDInt, err := RequiredInt(request, "resource_id")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			client, err := getClient(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get GitHub client: %w", err)
+			}
+
+			switch resourceType {
+			case actionsResourceWorkflow:
+				return getActionsResourceWorkflow(ctx, client, owner, repo, int64(resourceIDInt))
+			case actionsResourceWorkflowRun:
+				return nil, fmt.Errorf("get workflow run by ID not implemented yet")
+			case actionsResourceWorkflowJob:
+				return nil, fmt.Errorf("get workflow job by ID not implemented yet")
+			case actionsResourceUnknown:
+				return mcp.NewToolResultError(fmt.Sprintf("unknown resource type: %s", resourceTypeStr)), nil
+			default:
+				// Should not reach here
+				return mcp.NewToolResultError("unhandled resource type"), nil
+			}
+		}
+}
+
+func getActionsResourceWorkflow(ctx context.Context, client *github.Client, owner, repo string, resourceID int64) (*mcp.CallToolResult, error) {
+	workflow, resp, err := client.Actions.GetWorkflowByID(ctx, owner, repo, resourceID)
+	if err != nil {
+		return ghErrors.NewGitHubAPIErrorResponse(ctx, "failed to get workflow", resp, err), nil
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+	r, err := json.Marshal(workflow)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal workflow: %w", err)
+	}
+
+	return mcp.NewToolResultText(string(r)), nil
+}
+
 // ListWorkflows creates a tool to list workflows in a repository
 func ListWorkflows(getClient GetClientFn, t translations.TranslationHelperFunc) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("list_workflows",
