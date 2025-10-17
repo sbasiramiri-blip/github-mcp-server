@@ -259,12 +259,12 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(ListWorkflows(getClient, t)),
 			// toolsets.NewServerTool(ListWorkflowRuns(getClient, t)),
 			// toolsets.NewServerTool(GetWorkflowRun(getClient, t)),
-			// toolsets.NewServerTool(GetWorkflowRunLogs(getClient, t)),
+			toolsets.NewServerTool(GetWorkflowRunLogs(getClient, t)),
 			// toolsets.NewServerTool(ListWorkflowJobs(getClient, t)),
 			toolsets.NewServerTool(GetJobLogs(getClient, t, contentWindowSize)),
 			// toolsets.NewServerTool(ListWorkflowRunArtifacts(getClient, t)),
 			// toolsets.NewServerTool(DownloadWorkflowRunArtifact(getClient, t)),
-			toolsets.NewServerTool(GetWorkflowRunUsage(getClient, t)),
+			// toolsets.NewServerTool(GetWorkflowRunUsage(getClient, t)),
 		).
 		AddWriteTools(
 			toolsets.NewServerTool(RunWorkflow(getClient, t)),
