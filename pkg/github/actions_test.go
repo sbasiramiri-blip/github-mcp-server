@@ -415,19 +415,6 @@ func Test_CancelWorkflowRun(t *testing.T) {
 }
 
 func Test_ListWorkflowRunArtifacts(t *testing.T) {
-	// Verify tool definition once
-	mockClient := github.NewClient(nil)
-	tool, _ := ListWorkflowRunArtifacts(stubGetClientFn(mockClient), translations.NullTranslationHelper)
-
-	assert.Equal(t, "list_workflow_run_artifacts", tool.Name)
-	assert.NotEmpty(t, tool.Description)
-	assert.Contains(t, tool.InputSchema.Properties, "owner")
-	assert.Contains(t, tool.InputSchema.Properties, "repo")
-	assert.Contains(t, tool.InputSchema.Properties, "run_id")
-	assert.Contains(t, tool.InputSchema.Properties, "perPage")
-	assert.Contains(t, tool.InputSchema.Properties, "page")
-	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"owner", "repo", "run_id"})
-
 	tests := []struct {
 		name           string
 		mockedClient   *http.Client
@@ -490,21 +477,23 @@ func Test_ListWorkflowRunArtifacts(t *testing.T) {
 				),
 			),
 			requestArgs: map[string]any{
-				"owner":  "owner",
-				"repo":   "repo",
-				"run_id": float64(12345),
+				"action":      "list_workflow_artifacts",
+				"owner":       "owner",
+				"repo":        "repo",
+				"resource_id": float64(12345),
 			},
 			expectError: false,
 		},
 		{
-			name:         "missing required parameter run_id",
+			name:         "missing required parameter resource_id",
 			mockedClient: mock.NewMockedHTTPClient(),
 			requestArgs: map[string]any{
-				"owner": "owner",
-				"repo":  "repo",
+				"action": "list_workflow_artifacts",
+				"owner":  "owner",
+				"repo":   "repo",
 			},
 			expectError:    true,
-			expectedErrMsg: "missing required parameter: run_id",
+			expectedErrMsg: "missing required parameter: resource_id",
 		},
 	}
 
@@ -512,7 +501,7 @@ func Test_ListWorkflowRunArtifacts(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup client with mock
 			client := github.NewClient(tc.mockedClient)
-			_, handler := ListWorkflowRunArtifacts(stubGetClientFn(client), translations.NullTranslationHelper)
+			_, handler := ActionsRead(stubGetClientFn(client), translations.NullTranslationHelper)
 
 			// Create call request
 			request := createMCPRequest(tc.requestArgs)
@@ -543,17 +532,6 @@ func Test_ListWorkflowRunArtifacts(t *testing.T) {
 }
 
 func Test_DownloadWorkflowRunArtifact(t *testing.T) {
-	// Verify tool definition once
-	mockClient := github.NewClient(nil)
-	tool, _ := DownloadWorkflowRunArtifact(stubGetClientFn(mockClient), translations.NullTranslationHelper)
-
-	assert.Equal(t, "download_workflow_run_artifact", tool.Name)
-	assert.NotEmpty(t, tool.Description)
-	assert.Contains(t, tool.InputSchema.Properties, "owner")
-	assert.Contains(t, tool.InputSchema.Properties, "repo")
-	assert.Contains(t, tool.InputSchema.Properties, "artifact_id")
-	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"owner", "repo", "artifact_id"})
-
 	tests := []struct {
 		name           string
 		mockedClient   *http.Client
@@ -577,21 +555,23 @@ func Test_DownloadWorkflowRunArtifact(t *testing.T) {
 				),
 			),
 			requestArgs: map[string]any{
+				"action":      "download_workflow_artifact",
 				"owner":       "owner",
 				"repo":        "repo",
-				"artifact_id": float64(123),
+				"resource_id": float64(123),
 			},
 			expectError: false,
 		},
 		{
-			name:         "missing required parameter artifact_id",
+			name:         "missing required parameter resource_id",
 			mockedClient: mock.NewMockedHTTPClient(),
 			requestArgs: map[string]any{
-				"owner": "owner",
-				"repo":  "repo",
+				"action": "download_workflow_artifact",
+				"owner":  "owner",
+				"repo":   "repo",
 			},
 			expectError:    true,
-			expectedErrMsg: "missing required parameter: artifact_id",
+			expectedErrMsg: "missing required parameter: resource_id",
 		},
 	}
 
@@ -599,7 +579,7 @@ func Test_DownloadWorkflowRunArtifact(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup client with mock
 			client := github.NewClient(tc.mockedClient)
-			_, handler := DownloadWorkflowRunArtifact(stubGetClientFn(client), translations.NullTranslationHelper)
+			_, handler := ActionsRead(stubGetClientFn(client), translations.NullTranslationHelper)
 
 			// Create call request
 			request := createMCPRequest(tc.requestArgs)
@@ -631,17 +611,6 @@ func Test_DownloadWorkflowRunArtifact(t *testing.T) {
 }
 
 func Test_DeleteWorkflowRunLogs(t *testing.T) {
-	// Verify tool definition once
-	mockClient := github.NewClient(nil)
-	tool, _ := DeleteWorkflowRunLogs(stubGetClientFn(mockClient), translations.NullTranslationHelper)
-
-	assert.Equal(t, "delete_workflow_run_logs", tool.Name)
-	assert.NotEmpty(t, tool.Description)
-	assert.Contains(t, tool.InputSchema.Properties, "owner")
-	assert.Contains(t, tool.InputSchema.Properties, "repo")
-	assert.Contains(t, tool.InputSchema.Properties, "run_id")
-	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"owner", "repo", "run_id"})
-
 	tests := []struct {
 		name           string
 		mockedClient   *http.Client
@@ -712,17 +681,6 @@ func Test_DeleteWorkflowRunLogs(t *testing.T) {
 }
 
 func Test_GetWorkflowRunUsage(t *testing.T) {
-	// Verify tool definition once
-	mockClient := github.NewClient(nil)
-	tool, _ := GetWorkflowRunUsage(stubGetClientFn(mockClient), translations.NullTranslationHelper)
-
-	assert.Equal(t, "get_workflow_run_usage", tool.Name)
-	assert.NotEmpty(t, tool.Description)
-	assert.Contains(t, tool.InputSchema.Properties, "owner")
-	assert.Contains(t, tool.InputSchema.Properties, "repo")
-	assert.Contains(t, tool.InputSchema.Properties, "run_id")
-	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"owner", "repo", "run_id"})
-
 	tests := []struct {
 		name           string
 		mockedClient   *http.Client
@@ -761,9 +719,10 @@ func Test_GetWorkflowRunUsage(t *testing.T) {
 				),
 			),
 			requestArgs: map[string]any{
-				"owner":  "owner",
-				"repo":   "repo",
-				"run_id": float64(12345),
+				"action":      "get_workflow_run_usage",
+				"owner":       "owner",
+				"repo":        "repo",
+				"resource_id": float64(12345),
 			},
 			expectError: false,
 		},
@@ -771,11 +730,12 @@ func Test_GetWorkflowRunUsage(t *testing.T) {
 			name:         "missing required parameter run_id",
 			mockedClient: mock.NewMockedHTTPClient(),
 			requestArgs: map[string]any{
-				"owner": "owner",
-				"repo":  "repo",
+				"action": "get_workflow_run_usage",
+				"owner":  "owner",
+				"repo":   "repo",
 			},
 			expectError:    true,
-			expectedErrMsg: "missing required parameter: run_id",
+			expectedErrMsg: "missing required parameter: resource_id",
 		},
 	}
 
@@ -783,7 +743,7 @@ func Test_GetWorkflowRunUsage(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup client with mock
 			client := github.NewClient(tc.mockedClient)
-			_, handler := GetWorkflowRunUsage(stubGetClientFn(client), translations.NullTranslationHelper)
+			_, handler := ActionsRead(stubGetClientFn(client), translations.NullTranslationHelper)
 
 			// Create call request
 			request := createMCPRequest(tc.requestArgs)
@@ -1328,11 +1288,11 @@ func Test_ActionsResourceRead(t *testing.T) {
 
 	assert.Equal(t, "actions_resource_read", tool.Name)
 	assert.NotEmpty(t, tool.Description)
-	assert.Contains(t, tool.InputSchema.Properties, "resource")
+	assert.Contains(t, tool.InputSchema.Properties, "action")
 	assert.Contains(t, tool.InputSchema.Properties, "owner")
 	assert.Contains(t, tool.InputSchema.Properties, "repo")
 	assert.Contains(t, tool.InputSchema.Properties, "resource_id")
-	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"resource", "owner", "repo", "resource_id"})
+	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"action", "owner", "repo", "resource_id"})
 
 	tests := []struct {
 		name           string
@@ -1342,7 +1302,7 @@ func Test_ActionsResourceRead(t *testing.T) {
 		expectedErrMsg string
 	}{
 		{
-			name:         "missing required parameter resource",
+			name:         "missing required parameter action",
 			mockedClient: mock.NewMockedHTTPClient(),
 			requestArgs: map[string]any{
 				"owner":       "owner",
@@ -1350,13 +1310,13 @@ func Test_ActionsResourceRead(t *testing.T) {
 				"resource_id": float64(123),
 			},
 			expectError:    true,
-			expectedErrMsg: "missing required parameter: resource",
+			expectedErrMsg: "missing required parameter: action",
 		},
 		{
 			name:         "missing required parameter owner",
 			mockedClient: mock.NewMockedHTTPClient(),
 			requestArgs: map[string]any{
-				"resource":    "workflow",
+				"action":      "get_workflow",
 				"repo":        "repo",
 				"resource_id": float64(123),
 			},
@@ -1367,7 +1327,7 @@ func Test_ActionsResourceRead(t *testing.T) {
 			name:         "missing required parameter repo",
 			mockedClient: mock.NewMockedHTTPClient(),
 			requestArgs: map[string]any{
-				"resource":    "workflow",
+				"action":      "get_workflow",
 				"owner":       "owner",
 				"resource_id": float64(123),
 			},
@@ -1378,9 +1338,9 @@ func Test_ActionsResourceRead(t *testing.T) {
 			name:         "missing required parameter resource_id",
 			mockedClient: mock.NewMockedHTTPClient(),
 			requestArgs: map[string]any{
-				"owner":    "owner",
-				"repo":     "repo",
-				"resource": "workflow",
+				"action": "get_workflow",
+				"owner":  "owner",
+				"repo":   "repo",
 			},
 			expectError:    true,
 			expectedErrMsg: "missing required parameter: resource_id",
@@ -1389,13 +1349,13 @@ func Test_ActionsResourceRead(t *testing.T) {
 			name:         "unknown resource",
 			mockedClient: mock.NewMockedHTTPClient(),
 			requestArgs: map[string]any{
-				"resource":    "random",
+				"action":      "random",
 				"owner":       "owner",
 				"repo":        "repo",
 				"resource_id": float64(123),
 			},
 			expectError:    true,
-			expectedErrMsg: "unknown resource type: random",
+			expectedErrMsg: "unknown action: random",
 		},
 	}
 
@@ -1425,19 +1385,7 @@ func Test_ActionsResourceRead(t *testing.T) {
 	}
 }
 
-func Test_ActionsResourceRead_Workflow(t *testing.T) {
-	// Verify tool definition once
-	mockClient := github.NewClient(nil)
-	tool, _ := ActionsRead(stubGetClientFn(mockClient), translations.NullTranslationHelper)
-
-	assert.Equal(t, "actions_resource_read", tool.Name)
-	assert.NotEmpty(t, tool.Description)
-	assert.Contains(t, tool.InputSchema.Properties, "resource")
-	assert.Contains(t, tool.InputSchema.Properties, "owner")
-	assert.Contains(t, tool.InputSchema.Properties, "repo")
-	assert.Contains(t, tool.InputSchema.Properties, "resource_id")
-	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"resource", "owner", "repo", "resource_id"})
-
+func Test_ActionsResourceRead_GetWorkflow(t *testing.T) {
 	tests := []struct {
 		name                 string
 		mockedClient         *http.Client
@@ -1465,7 +1413,7 @@ func Test_ActionsResourceRead_Workflow(t *testing.T) {
 				),
 			),
 			requestArgs: map[string]any{
-				"resource":    "workflow",
+				"action":      "get_workflow",
 				"owner":       "owner",
 				"repo":        "repo",
 				"resource_id": float64(1),
@@ -1483,7 +1431,7 @@ func Test_ActionsResourceRead_Workflow(t *testing.T) {
 				),
 			),
 			requestArgs: map[string]any{
-				"resource":    "workflow",
+				"action":      "get_workflow",
 				"owner":       "owner",
 				"repo":        "repo",
 				"resource_id": float64(2),
@@ -1532,19 +1480,7 @@ func Test_ActionsResourceRead_Workflow(t *testing.T) {
 	}
 }
 
-func Test_ActionsResourceRead_WorkflowRun(t *testing.T) {
-	// Verify tool definition once
-	mockClient := github.NewClient(nil)
-	tool, _ := ActionsRead(stubGetClientFn(mockClient), translations.NullTranslationHelper)
-
-	assert.Equal(t, "actions_resource_read", tool.Name)
-	assert.NotEmpty(t, tool.Description)
-	assert.Contains(t, tool.InputSchema.Properties, "resource")
-	assert.Contains(t, tool.InputSchema.Properties, "owner")
-	assert.Contains(t, tool.InputSchema.Properties, "repo")
-	assert.Contains(t, tool.InputSchema.Properties, "resource_id")
-	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"resource", "owner", "repo", "resource_id"})
-
+func Test_ActionsResourceRead_GetWorkflowRun(t *testing.T) {
 	tests := []struct {
 		name                 string
 		mockedClient         *http.Client
@@ -1572,7 +1508,7 @@ func Test_ActionsResourceRead_WorkflowRun(t *testing.T) {
 				),
 			),
 			requestArgs: map[string]any{
-				"resource":    "workflow_run",
+				"action":      "get_workflow_run",
 				"owner":       "owner",
 				"repo":        "repo",
 				"resource_id": float64(12345),
@@ -1590,7 +1526,7 @@ func Test_ActionsResourceRead_WorkflowRun(t *testing.T) {
 				),
 			),
 			requestArgs: map[string]any{
-				"resource":    "workflow_run",
+				"action":      "get_workflow_run",
 				"owner":       "owner",
 				"repo":        "repo",
 				"resource_id": float64(99999),
@@ -1641,19 +1577,7 @@ func Test_ActionsResourceRead_WorkflowRun(t *testing.T) {
 	}
 }
 
-func Test_ActionsResourceRead_WorkflowRuns(t *testing.T) {
-	// Verify tool definition once
-	mockClient := github.NewClient(nil)
-	tool, _ := ActionsRead(stubGetClientFn(mockClient), translations.NullTranslationHelper)
-
-	assert.Equal(t, "actions_resource_read", tool.Name)
-	assert.NotEmpty(t, tool.Description)
-	assert.Contains(t, tool.InputSchema.Properties, "resource")
-	assert.Contains(t, tool.InputSchema.Properties, "owner")
-	assert.Contains(t, tool.InputSchema.Properties, "repo")
-	assert.Contains(t, tool.InputSchema.Properties, "resource_id")
-	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"resource", "owner", "repo", "resource_id"})
-
+func Test_ActionsResourceRead_ListWorkflowRuns(t *testing.T) {
 	tests := []struct {
 		name                 string
 		mockedClient         *http.Client
@@ -1693,7 +1617,7 @@ func Test_ActionsResourceRead_WorkflowRuns(t *testing.T) {
 				),
 			),
 			requestArgs: map[string]any{
-				"resource":    "workflow_runs",
+				"action":      "list_workflow_runs",
 				"owner":       "owner",
 				"repo":        "repo",
 				"resource_id": float64(1),
@@ -1732,11 +1656,11 @@ func Test_ActionsResourceRead_WorkflowRuns(t *testing.T) {
 				),
 			),
 			requestArgs: map[string]any{
-				"resource":    "workflow_runs",
+				"action":      "list_workflow_runs",
 				"owner":       "owner",
 				"repo":        "repo",
 				"resource_id": float64(1),
-				"workflow_runs_filter": map[string]string{
+				"workflow_runs_filter": map[string]any{
 					"actor":  "omgitsads",
 					"status": "completed",
 				},
@@ -1754,7 +1678,7 @@ func Test_ActionsResourceRead_WorkflowRuns(t *testing.T) {
 				),
 			),
 			requestArgs: map[string]any{
-				"resource":    "workflow_runs",
+				"action":      "list_workflow_runs",
 				"owner":       "owner",
 				"repo":        "repo",
 				"resource_id": float64(99999),
