@@ -1718,3 +1718,266 @@ func Test_ActionsResourceRead_ListWorkflowRuns(t *testing.T) {
 		})
 	}
 }
+
+func Test_ActionsResourceRead_GetWorkflowJob(t *testing.T) {
+	tests := []struct {
+		name                 string
+		mockedClient         *http.Client
+		requestArgs          map[string]any
+		expectError          bool
+		expectedErrMsg       string
+		expectedErrMsgRegexp *regexp.Regexp
+	}{
+		{
+			name: "successful workflow job read",
+			mockedClient: mock.NewMockedHTTPClient(
+				mock.WithRequestMatchHandler(
+					mock.GetReposActionsJobsByOwnerByRepoByJobId,
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						job := &github.WorkflowJob{
+							ID:         github.Ptr(int64(12345)),
+							RunID:      github.Ptr(int64(1)),
+							Status:     github.Ptr("completed"),
+							Conclusion: github.Ptr("success"),
+						}
+						w.WriteHeader(http.StatusOK)
+						_ = json.NewEncoder(w).Encode(job)
+					}),
+				),
+			),
+			requestArgs: map[string]any{
+				"action":      "get_workflow_job",
+				"owner":       "owner",
+				"repo":        "repo",
+				"resource_id": float64(12345),
+			},
+			expectError: false,
+		},
+		{
+			name: "missing workflow job read",
+			mockedClient: mock.NewMockedHTTPClient(
+				mock.WithRequestMatchHandler(
+					mock.GetReposActionsJobsByOwnerByRepoByJobId,
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusNotFound)
+					}),
+				),
+			),
+			requestArgs: map[string]any{
+				"action":      "get_workflow_job",
+				"owner":       "owner",
+				"repo":        "repo",
+				"resource_id": float64(99999),
+			},
+			expectError:          true,
+			expectedErrMsgRegexp: regexp.MustCompile(`^failed to get workflow job: GET .*/repos/owner/repo/actions/jobs/99999: 404.*$`),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup client with mock
+			client := github.NewClient(tc.mockedClient)
+			_, handler := ActionsRead(stubGetClientFn(client), translations.NullTranslationHelper)
+
+			// Create call request
+			request := createMCPRequest(tc.requestArgs)
+
+			// Call handler
+			result, err := handler(context.Background(), request)
+
+			require.NoError(t, err)
+			require.Equal(t, tc.expectError, result.IsError)
+
+			// Parse the result and get the text content if no error
+			textContent := getTextResult(t, result)
+
+			if tc.expectedErrMsg != "" {
+				assert.Contains(t, tc.expectedErrMsg, textContent.Text)
+				return
+			}
+
+			if tc.expectedErrMsgRegexp != nil {
+				assert.Regexp(t, tc.expectedErrMsgRegexp, textContent.Text)
+				return
+			}
+		})
+	}
+}
+
+func Test_ActionsResourceRead_ListWorkflowJobs(t *testing.T) {
+	tests := []struct {
+		name                 string
+		mockedClient         *http.Client
+		requestArgs          map[string]any
+		expectError          bool
+		expectedErrMsg       string
+		expectedErrMsgRegexp *regexp.Regexp
+	}{
+		{
+			name: "successful workflow jobs read",
+			mockedClient: mock.NewMockedHTTPClient(
+				mock.WithRequestMatchHandler(
+					mock.GetReposActionsRunsJobsByOwnerByRepoByRunId,
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						jobs := &github.Jobs{
+							TotalCount: github.Ptr(2),
+							Jobs: []*github.WorkflowJob{
+								{
+									ID:         github.Ptr(int64(12345)),
+									RunID:      github.Ptr(int64(1)),
+									Status:     github.Ptr("completed"),
+									Conclusion: github.Ptr("success"),
+								},
+								{
+									ID:         github.Ptr(int64(12346)),
+									RunID:      github.Ptr(int64(1)),
+									Status:     github.Ptr("completed"),
+									Conclusion: github.Ptr("failure"),
+								},
+							},
+						}
+						w.WriteHeader(http.StatusOK)
+						_ = json.NewEncoder(w).Encode(jobs)
+					}),
+				),
+			),
+			requestArgs: map[string]any{
+				"action":      "list_workflow_jobs",
+				"owner":       "owner",
+				"repo":        "repo",
+				"resource_id": float64(1),
+			},
+			expectError: false,
+		},
+		{
+			name: "missing workflow runs read",
+			mockedClient: mock.NewMockedHTTPClient(
+				mock.WithRequestMatchHandler(
+					mock.GetReposActionsRunsJobsByOwnerByRepoByRunId,
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusNotFound)
+					}),
+				),
+			),
+			requestArgs: map[string]any{
+				"action":      "list_workflow_jobs",
+				"owner":       "owner",
+				"repo":        "repo",
+				"resource_id": float64(99999),
+			},
+			expectError:          true,
+			expectedErrMsgRegexp: regexp.MustCompile(`^failed to list workflow jobs: GET .*/repos/owner/repo/actions/runs/99999/jobs.* 404.*$`),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup client with mock
+			client := github.NewClient(tc.mockedClient)
+			_, handler := ActionsRead(stubGetClientFn(client), translations.NullTranslationHelper)
+
+			// Create call request
+			request := createMCPRequest(tc.requestArgs)
+
+			// Call handler
+			result, err := handler(context.Background(), request)
+
+			require.NoError(t, err)
+			require.Equal(t, tc.expectError, result.IsError)
+
+			// Parse the result and get the text content if no error
+			textContent := getTextResult(t, result)
+
+			if tc.expectedErrMsg != "" {
+				assert.Contains(t, tc.expectedErrMsg, textContent.Text)
+				return
+			}
+
+			if tc.expectedErrMsgRegexp != nil {
+				assert.Regexp(t, tc.expectedErrMsgRegexp, textContent.Text)
+				return
+			}
+		})
+	}
+}
+
+func Test_ActionsResourceRead_DownloadWorkflowArtifact(t *testing.T) {
+	tests := []struct {
+		name                 string
+		mockedClient         *http.Client
+		requestArgs          map[string]any
+		expectError          bool
+		expectedErrMsg       string
+		expectedErrMsgRegexp *regexp.Regexp
+	}{
+		{
+			name: "successful workflow artifact download",
+			mockedClient: mock.NewMockedHTTPClient(
+				mock.WithRequestMatchHandler(
+					mock.GetReposActionsArtifactsByOwnerByRepoByArtifactIdByArchiveFormat,
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusFound)
+						w.Header().Set("Location", "https://github.com/artifact/download/url")
+					}),
+				),
+			),
+			requestArgs: map[string]any{
+				"action":      "download_workflow_artifact",
+				"owner":       "owner",
+				"repo":        "repo",
+				"resource_id": float64(12345),
+			},
+			expectError: false,
+		},
+		{
+			name: "missing workflow artifact download",
+			mockedClient: mock.NewMockedHTTPClient(
+				mock.WithRequestMatchHandler(
+					mock.GetReposActionsArtifactsByOwnerByRepoByArtifactId,
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusNotFound)
+					}),
+				),
+			),
+			requestArgs: map[string]any{
+				"action":      "download_workflow_artifact",
+				"owner":       "owner",
+				"repo":        "repo",
+				"resource_id": float64(99999),
+			},
+			expectError:    true,
+			expectedErrMsg: "failed to get artifact download URL: unexpected status code: 404 Not Found",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup client with mock
+			client := github.NewClient(tc.mockedClient)
+			_, handler := ActionsRead(stubGetClientFn(client), translations.NullTranslationHelper)
+
+			// Create call request
+			request := createMCPRequest(tc.requestArgs)
+
+			// Call handler
+			result, err := handler(context.Background(), request)
+
+			require.NoError(t, err)
+			require.Equal(t, tc.expectError, result.IsError)
+
+			// Parse the result and get the text content if no error
+			textContent := getTextResult(t, result)
+
+			if tc.expectedErrMsg != "" {
+				assert.Contains(t, tc.expectedErrMsg, textContent.Text)
+				return
+			}
+
+			if tc.expectedErrMsgRegexp != nil {
+				assert.Regexp(t, tc.expectedErrMsgRegexp, textContent.Text)
+				return
+			}
+		})
+	}
+}
