@@ -11,8 +11,7 @@
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/github/github-mcp-server",
-      "version": "${VERSION}",
+      "identifier": "ghcr.io/github/github-mcp-server:${VERSION}",
       "transport": {
         "type": "stdio"
       },
