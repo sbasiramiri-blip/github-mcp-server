@@ -158,29 +158,22 @@ func GetDefaultToolsetIDs() []string {
 func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetGQLClientFn, getRawClient raw.GetRawClientFn, t translations.TranslationHelperFunc, contentWindowSize int) *toolsets.ToolsetGroup {
 	tsg := toolsets.NewToolsetGroup(readOnly)
 
-	// Define all available features with their default state (disabled)
+	// Define all available features with their default state (disabled) 
 	// Create toolsets
 	repos := toolsets.NewToolset(ToolsetMetadataRepos.ID, ToolsetMetadataRepos.Description).
 		AddReadTools(
 			toolsets.NewServerTool(SearchRepositories(getClient, t)),
 			toolsets.NewServerTool(GetFileContents(getClient, getRawClient, t)),
-			toolsets.NewServerTool(ListCommits(getClient, t)),
+			toolsets.NewServerTool(CommitRead(getClient, t)),
 			toolsets.NewServerTool(SearchCode(getClient, t)),
-			toolsets.NewServerTool(GetCommit(getClient, t)),
 			toolsets.NewServerTool(ListBranches(getClient, t)),
-			toolsets.NewServerTool(ListTags(getClient, t)),
-			toolsets.NewServerTool(GetTag(getClient, t)),
-			toolsets.NewServerTool(ListReleases(getClient, t)),
-			toolsets.NewServerTool(GetLatestRelease(getClient, t)),
-			toolsets.NewServerTool(GetReleaseByTag(getClient, t)),
+			toolsets.NewServerTool(ReleaseRead(getClient, t)),
 		).
 		AddWriteTools(
-			toolsets.NewServerTool(CreateOrUpdateFile(getClient, t)),
+			toolsets.NewServerTool(FileWrite(getClient, t)),
 			toolsets.NewServerTool(CreateRepository(getClient, t)),
 			toolsets.NewServerTool(ForkRepository(getClient, t)),
 			toolsets.NewServerTool(CreateBranch(getClient, t)),
-			toolsets.NewServerTool(PushFiles(getClient, t)),
-			toolsets.NewServerTool(DeleteFile(getClient, t)),
 		).
 		AddResourceTemplates(
 			toolsets.NewServerResourceTemplate(GetRepositoryResourceContent(getClient, getRawClient, t)),

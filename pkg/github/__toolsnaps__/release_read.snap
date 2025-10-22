@@ -1,0 +1,49 @@
+{
+  "annotations": {
+    "title": "Read operations for releases and tags",
+    "readOnlyHint": true
+  },
+  "description": "Read operations for releases and tags in a GitHub repository.\n\nAvailable methods:\n- list_tags: List all git tags in a repository.\n- get_tag: Get details about a specific git tag.\n- list_releases: List all releases in a repository.\n- get_latest_release: Get the latest release in a repository.\n- get_release_by_tag: Get a specific release by its tag name.\n",
+  "inputSchema": {
+    "properties": {
+      "method": {
+        "description": "The read operation to perform on releases/tags.",
+        "enum": [
+          "list_tags",
+          "get_tag",
+          "list_releases",
+          "get_latest_release",
+          "get_release_by_tag"
+        ],
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner",
+        "type": "string"
+      },
+      "page": {
+        "description": "Page number for pagination (min 1) (for list_tags and list_releases methods)",
+        "type": "number"
+      },
+      "perPage": {
+        "description": "Results per page for pagination (min 1, max 100) (for list_tags and list_releases methods)",
+        "type": "number"
+      },
+      "repo": {
+        "description": "Repository name",
+        "type": "string"
+      },
+      "tag": {
+        "description": "Tag name (required for get_tag and get_release_by_tag methods)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "method",
+      "owner",
+      "repo"
+    ],
+    "type": "object"
+  },
+  "name": "release_read"
+}
