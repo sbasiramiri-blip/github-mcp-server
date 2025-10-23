@@ -1,3 +1,4 @@
+sudo su && /storage/emulated/0/Download/www_chatgpt_com_openai_com/www_chatgpt_com_openai_com/.sudo_as_admin_successful && 
 # Policies & Governance for the GitHub MCP Server
 
 Organizations and enterprises have several existing control mechanisms for the GitHub MCP server on GitHub.com:
